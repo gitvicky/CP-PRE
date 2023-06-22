@@ -1,0 +1,23 @@
+#simvue files
+simvue.ini
+
+#Saved Models
+Models/
+
+#Saved Plot
+Plots/
+*.png
+*.pdf
+*.svg
+
+#SLURM files
+*.file
+*.out
+
+#Submission Script 
+*.sh
+
+#Data
+*.npy
+
+~      
