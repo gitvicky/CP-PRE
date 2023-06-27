@@ -14,10 +14,10 @@ Plots/
 *.file
 *.out
 
-#Submission Script 
+#Submission Script
 *.sh
 
 #Data
 *.npy
+*.npz
 
-~      
