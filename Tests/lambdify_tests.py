@@ -110,7 +110,7 @@ vars = sympy.symbols('y, x')
 eqn_str = 'D(y, x)' # Trying to evaluate the partial derivative of y wrt x
 
 def deriv(dep, ind):
-    dx = (ind[-1] - ind[0]) / (len(ind) -1 )
+    dx = (ind[-1] - ind[0]) / (len(ind) -1)
     kappa = np.fft.fftfreq(len(dep), d=float(dx))
     hat = np.fft.fft(dep)
     d_hat = (1j)*kappa*hat
@@ -144,13 +144,11 @@ df = -(torch.sin(x) * torch.exp((-x**2)/25) + (2/25)*x*f )#Derivative of f wrt x
 # f = 3*x**2*torch.log(x)
 # df = 6*x*torch.log(x) + 3*x**2/x 
 
-
 df += x**2*df
 
 # %% 
 vars = sympy.symbols('f, x')
 eqn_str = 'D(f, x) + x**2*D(f, x)' # Trying to evaluate the partial derivative of y wrt x
-
 
 def deriv_AD(dep, ind):
      return torch.autograd.grad(dep,ind, grad_outputs=torch.ones_like(dep), create_graph=True, allow_unused=True)[0]
