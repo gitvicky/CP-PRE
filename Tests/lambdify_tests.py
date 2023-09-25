@@ -82,7 +82,7 @@ print('Calculated Derivative (FD) : ' + str(fn(b,a)))
 print('Calculated Derivative (FD CS) : ' + str(fn_CS(b,a)))
 
 # %%
-#Spectral Derviatives
+#Spectral Derviatives --- Needs to look into this as the derivatives are rather off. 
 
 vars = sympy.symbols('y, x')
 eqn_str = 'D(y, x)' # Trying to evaluate the partial derivative of y wrt x
@@ -165,12 +165,12 @@ def deriv_FD(dep, ind):
 fn_FD = sympy.lambdify(vars, eqn_str, {'D': deriv_FD})
 df_FD = fn_FD(f, x)
 
-def deriv_FD_CS(dep, ind):
-    deriv = torch.zeros(dep.shape)
-    deriv[1:-1] = (dep[2:] -2*dep[1:-1] - dep[:-2]) / dx**2
-    deriv[-1] = deriv[-2]
-    deriv[0] = deriv[1]
-    return deriv
+# def deriv_FD_CS(dep, ind): #This is not CS but second order dummy !!
+#     deriv = torch.zeros(dep.shape)
+#     deriv[1:-1] = (dep[2:] -2*dep[1:-1] - dep[:-2]) / dx**2
+#     deriv[-1] = deriv[-2]
+#     deriv[0] = deriv[1]
+#     return deriv
 
 fn_FD_CS = sympy.lambdify(vars, eqn_str, {'D': deriv_FD})
 df_FD_CS = fn_FD_CS(f, x)

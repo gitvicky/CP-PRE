@@ -30,8 +30,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pyDOE import lhs 
 from Burgers_fft import *
+from simvue import Run
 # %%
-n_sims = 5000 #Total Number of simulation datapoints to be generated. 
+n_sims = 5 #Total Number of simulation datapoints to be generated. 
 
 #Grabbing the simulation parameters from the specified domain. 
  #alpha, beta, gamma
@@ -41,23 +42,23 @@ ub = np.asarray([3, 3, 3]) # Upper bound of the parameter domain
 params = lb + (ub - lb) * lhs(3, n_sims)
 
 # %% 
-from simvue import Run
-
-configuration = {'viscosity': 0.002,
-                 'domain length': 2.0,
-                 'discretisation': 1000,
-                 'dt': 0.0025,
-                 'iterations': 500,
-                 }
-# %%
 if __name__ == "__main__":
+
+
+    configuration = {'domain length': 2.0,
+                    'discretisation': 1000,
+                    'dt': 0.0025,
+                    'iterations': 500,
+                    }
     u_list = []
     for sim in tqdm(range(n_sims)):
-        run = Run(mode='disabled')
+        run = Run(mode='online')
         configuration['alpha'] = params[sim, 0]
         configuration['beta'] = params[sim, 1]
         configuration['gamma'] = params[sim, 2]
-        run.init(folder="/Burgers", tags=['Burgers1D', 'Spectral'], metadata=configuration)
+        configuration['viscosity'] = np.random.uniform(0.002, 0.02) #Exploring the viscosities lying in this range
+
+        run.init(folder="/API_Demo/Burgers", tags=['Burgers1D', 'Spectral', 'API Demo', 'GP'], metadata=configuration)
         u_sol = solve_burgers(run, configuration) #Running the simulation with the specified configuration
         u_list.append(u_sol)
         #Passing the simvue run object as well. 
@@ -78,9 +79,9 @@ if __name__ == "__main__":
 
         run.close()
 
-# %%
-#[BS, time, space]
-u = np.asarray(u_list)
-u = u[:,::10, ::5]
-np.save('Burgers1d_sliced_5K.npy', u)
+# # %%
+# #[BS, time, space]
+# u = np.asarray(u_list)
+# u = u[:,::10, ::5]
+# # np.save('Burgers1d_sliced_5K.npy', u)
 # %%

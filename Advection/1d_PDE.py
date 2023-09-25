@@ -23,7 +23,7 @@ import sympy
 '''
 # 1D Advection Equation 
     U_t + v U_x = 0
-where, v = 1.0
+where, v = [0.1, 1.0]
 
 Exact Solver : 
   U(x,t) = exp(-200*(x-xc-v*t).^2)
@@ -31,20 +31,20 @@ Exact Solver :
   xc - location of the center -- 0.25
 
 '''
-from Advection_1D import *
+from Advection_numerical import *
 #Obtaining the exact and FD solution of the 1D Advection Equation. 
 x_discretisation, t_end = 200, 1.0
-solver = Advection_1d(x_discretisation, t_end)
+pos = 0.25
+v = 1.0 #Convection Velocity
+solver = Advection_1d(xc=pos, v=v)
 x, t, u_sol, u_exact = solver.solve()
 
 dt = solver.dt
 dx = solver.dx
-v = 1.0 #Convection Velocity
 
 # u_sol = u_sol[:50]
 # u_exact = u_exact[:50]
 # %%
-
 #Exact solution of tthe generic form u(x,t) = u0*(x − wt)
 exact_fn = lambda it : np.exp(-200*(x-solver.xc - v*it*dt)**2)
 du_dx =  lambda it : - exact_fn(it) * (-400*it*dt + 400*x - 100)
