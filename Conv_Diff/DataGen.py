@@ -3,6 +3,8 @@
 """
 
 Data Generation of the Convection-Diffusion PDE Solutions
+u_t = D.u_xx +u.D_x - c.u_x
+
 """
 
 # %%
@@ -11,12 +13,9 @@ import numpy as np
 from pyDOE import lhs 
 from tqdm import tqdm 
 from time import time
-
 from matplotlib import pyplot as plt 
 
-# from SimRun import run_sim
-from RunSim_simtrack import run_sim
-# from RunSim_wandb import run_sim
+from CD_numerical import run_sim
 
 
 # %%

@@ -395,6 +395,8 @@ u_pred = pred_set[idx].numpy()
 u_mae = np.abs(u_actual - u_pred)
 u_mse = (u_actual - u_pred)**2
 
+u_pred = u_actual
+
 
 fig = plt.figure(figsize=(10, 6))
 plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
@@ -479,4 +481,9 @@ plt.colorbar()
 
 
 # %%
+#Testing out sampling via perturbations. 
+# plt.plot(u_pred[0])
+# plt.plot(u_residual[0])
+res_0 = u_residual[0]
 
+# %%

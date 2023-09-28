@@ -16,7 +16,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
 def poisson_solve( rho, kSq_inv ):
 	""" solve the Poisson equation, given source field rho """
 	V_hat = -(np.fft.fftn( rho )) * kSq_inv
@@ -66,10 +65,10 @@ def main():
 	N         = 400     # Spatial resolution
 	t         = 0       # current time of the simulation
 	tEnd      = 1       # time at which simulation ends
-	dt        = 0.001   # timestep
+	dt        = 0.0001   # timestep
 	tOut      = 0.01    # draw frequency
 	nu        = 0.001   # viscosity
-	plotRealTime = False # switch on for plotting as the simulation goes along
+	plotRealTime = True # switch on for plotting as the simulation goes along
 	
 	# Domain [0,1] x [0,1]
 	L = 1    
@@ -78,8 +77,8 @@ def main():
 	xx, yy = np.meshgrid(xlin, xlin)
 	
 	# Intial Condition (vortex)
-	vx = -np.sin(2*np.pi*yy) 
-	vy =  np.sin(2*np.pi*xx*2) 
+	vx = -np.sin(2*np.pi*yy**2) 
+	vy =  np.cos(2*np.pi*xx**2) 
 	
 	# Fourier Space Variables
 	klin = 2.0 * np.pi / L * np.arange(-N/2, N/2)
@@ -165,3 +164,5 @@ def main():
 
 if __name__== "__main__":
   main()
+
+	# %%
