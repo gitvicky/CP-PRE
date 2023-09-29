@@ -486,4 +486,101 @@ plt.colorbar()
 # plt.plot(u_residual[0])
 res_0 = u_residual[0]
 
-# %%
+# %% Bound residual
+
+u_pred = u_actual
+grads = np.gradient(u_pred, dt, dx, axis=[0,1])
+u_residual = grads[0][:, :] + v[80+idx]*grads[1][:, :]
+
+plt.plot(u_pred[0, :])
+
+plt.figure()
+u_residual
+plt.plot(u_residual[0,:])
+
+
+
+N_samples = 100000
+Relative_width = 1
+
+u_actual_pert = np.repeat(u_actual[None, :], N_samples, axis = 0)
+# u_actual_pert = u_actual_pert.reshape(u_actual_pert.shape[1], u_actual_pert.shape[2], u_actual_pert.shape[0])
+
+u_pred_purtub = u_actual_pert + np.random.uniform(-1, 1, u_actual_pert.shape) * Relative_width * u_actual_pert
+
+min_curve = np.min(u_pred_purtub[:, 0,:], axis = 0)
+max_curve = np.max(u_pred_purtub[:, 0,:], axis = 0)
+
+plt.figure()
+plt.plot(min_curve)
+plt.plot(max_curve)
+plt.plot(u_actual[0,:])
+plt.show()
+
+
+grads_perturb = np.gradient(u_pred_purtub, dt, dx, axis=[1,2])
+u_residual_pert = grads_perturb[0][:, :] + v[80+idx]*grads_perturb[1][:, :]
+
+u_residual_pert = u_residual_pert
+
+min_res = np.min(u_residual_pert[:, 0, :], axis = 0)
+max_res = np.max(u_residual_pert[:, 0, :], axis = 0)
+
+
+plt.figure()
+plt.plot(min_res)
+plt.plot(max_res)
+plt.plot(u_residual[0,:])
+plt.show()
+
+lower_bound_ok = all(min_res <= 0)
+upper_bound_ok = all(0 <= max_res)
+
+print(f"Lower bound ok: {lower_bound_ok} || Upper bound ok: {upper_bound_ok}")
+plt.plot(min_res <= 0)
+
+
+# fig = plt.figure(figsize=(10, 6))
+# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+
+# ax = fig.add_subplot(3,2,1)
+# pcm =ax.imshow(u_actual, cmap=cm.coolwarm, extent=[0.0, 2.0, 0, 0.5])
+# ax.title.set_text('Actual')
+# ax.set_xlabel('x')
+# ax.set_ylabel('t')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+# ax = fig.add_subplot(3,2,2)
+# pcm =ax.imshow(u_pred, cmap=cm.coolwarm, extent=[0.0, 2.0, 0, 0.5])
+# ax.title.set_text('Pred')
+# ax.set_xlabel('x')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+
+# #First order FD
+# grads = np.gradient(u_pred, dt, dx, axis=[0,1])
+# u_residual = grads[0][:, :] + v[80+idx]*grads[1][:, :]
+
+# ax = fig.add_subplot(3,2,5)
+# pcm =ax.imshow(u_residual, cmap=cm.coolwarm, extent=[0.0, 2.0, 0, 0.5])
+# ax.title.set_text('1st Order FD')
+# ax.set_xlabel('x')
+# ax.set_ylabel('t')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+# # %%
+# #For all the test sims
+# grads = np.gradient(pred_set, dt, dx, axis=[1,2])
+# u_residual = grads[0][idx, :, :] + v[80+idx]*grads[1][idx, :, :]
+
+# plt.imshow(u_residual)
+# plt.colorbar()
