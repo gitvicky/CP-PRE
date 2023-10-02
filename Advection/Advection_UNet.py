@@ -492,20 +492,19 @@ u_pred = u_actual
 grads = np.gradient(u_pred, dt, dx, axis=[0,1])
 u_residual = grads[0][:, :] + v[80+idx]*grads[1][:, :]
 
+plt.figure()
 plt.plot(u_pred[0, :])
+plt.savefig("u_pred.png")
 
 plt.figure()
-u_residual
 plt.plot(u_residual[0,:])
+plt.savefig("u_residual.png")
 
 
-
-N_samples = 100000
-Relative_width = 1
+N_samples = 10000
+Relative_width = 0.005
 
 u_actual_pert = np.repeat(u_actual[None, :], N_samples, axis = 0)
-# u_actual_pert = u_actual_pert.reshape(u_actual_pert.shape[1], u_actual_pert.shape[2], u_actual_pert.shape[0])
-
 u_pred_purtub = u_actual_pert + np.random.uniform(-1, 1, u_actual_pert.shape) * Relative_width * u_actual_pert
 
 min_curve = np.min(u_pred_purtub[:, 0,:], axis = 0)
@@ -515,6 +514,7 @@ plt.figure()
 plt.plot(min_curve)
 plt.plot(max_curve)
 plt.plot(u_actual[0,:])
+plt.savefig("u_perterub_1.png")
 plt.show()
 
 
@@ -523,21 +523,63 @@ u_residual_pert = grads_perturb[0][:, :] + v[80+idx]*grads_perturb[1][:, :]
 
 u_residual_pert = u_residual_pert
 
-min_res = np.min(u_residual_pert[:, 0, :], axis = 0)
-max_res = np.max(u_residual_pert[:, 0, :], axis = 0)
+id = 0
 
+min_res = np.min(u_residual_pert[:, id, :], axis = 0)
+max_res = np.max(u_residual_pert[:, id, :], axis = 0)
 
 plt.figure()
 plt.plot(min_res)
 plt.plot(max_res)
-plt.plot(u_residual[0,:])
+plt.plot(u_residual[id,:])
+plt.savefig("residual_bound.png")
+plt.show()
+
+
+## Plot individual examples
+
+plt.figure()
+plt.plot(min_res)
+plt.plot(max_res)
+plt.plot(u_residual_pert[0, id, :].T, color = "grey", alpha = 0.8)
+plt.plot(u_residual[id,:])
+plt.savefig("peturb_1.png")
+plt.show()
+
+plt.figure()
+plt.plot(min_res)
+plt.plot(max_res)
+plt.plot(u_residual_pert[:500, id, :].T, color = "grey", alpha = 0.8)
+plt.plot(u_residual[id,:])
+plt.savefig("peturb_many.png")
 plt.show()
 
 lower_bound_ok = all(min_res <= 0)
 upper_bound_ok = all(0 <= max_res)
 
+
 print(f"Lower bound ok: {lower_bound_ok} || Upper bound ok: {upper_bound_ok}")
 plt.plot(min_res <= 0)
+
+
+## Perturb using svd of training data
+
+# from scipy import linalg
+# from scipy.linalg import svd
+
+# u, s, vh = svd(train_u[0,:,:], check_finite=False)
+
+
+
+# s_ = s[:truncation_order]
+# u_ = u[:, :truncation_order]
+
+# captured_var = np.sum(s_)
+# total_var = np.sum(s)
+
+# C_test = u[:, :s_.size] @ np.diag(s_) @ u[:, :s_.size].T
+
+
 
 
 # fig = plt.figure(figsize=(10, 6))
