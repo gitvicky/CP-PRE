@@ -7,7 +7,7 @@ Surrogate Model for the 1D Advection solved using a 1D U-Net Model
     U_t + v U_x = 0
 """
 
-# %% 
+#%%
 
 configuration = {"Case": 'Advection',
                  "Field": 'u',
