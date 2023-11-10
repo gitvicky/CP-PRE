@@ -4,6 +4,9 @@ simvue.ini
 #Saved Models
 Models/
 
+#Venv
+venv/
+
 #Saved Plot
 Plots/
 *.png
