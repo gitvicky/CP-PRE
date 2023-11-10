@@ -15,7 +15,7 @@ div(v) = 0
 configuration = {"Spatial Resolution": 400, # Spatial resolution
 				 "Start Time": 0.0,  # current time of the simulation
                  "End Time": 1.0, # time at which simulation ends
-				 "Timestep": 0.0001, # timestep
+				 "Timestep": 0.001, # timestep
 				 "Viscosity": 0.001, # viscosity
 				 "Domain Length": 1}
 # %% 
@@ -80,7 +80,7 @@ tEnd      = configuration["End Time"]      # time at which simulation ends
 dt        = configuration['Timestep']   # timestep
 tOut      = 0.01    # draw frequency
 nu        = configuration['Viscosity']   # viscosity
-plotRealTime = False # switch on for plotting as the simulation goes along
+plotRealTime = True # switch on for plotting as the simulation goes along
 
 # Domain [0,1] x [0,1]
 L = configuration['Domain Length']
@@ -89,8 +89,12 @@ xlin = xlin[0:N]                  # chop off periodic point
 xx, yy = np.meshgrid(xlin, xlin)
 
 # Intial Condition (vortex)
-vx = -np.sin(2*np.pi*yy**2) 
-vy =  np.cos(2*np.pi*xx**2) 
+# vx = -np.sin(2*np.pi*yy**2) 
+# vy =  np.cos(2*np.pi*xx**2) 
+
+vx = -np.sin(2*np.pi*yy)
+vy =  np.sin(2*np.pi*xx*2)
+			  
 
 # Fourier Space Variables
 klin = 2.0 * np.pi / L * np.arange(-N/2, N/2)
