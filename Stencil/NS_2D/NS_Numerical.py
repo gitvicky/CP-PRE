@@ -133,7 +133,7 @@ class Navier_Stokes_2d:
 			#update time
 			self.t += self.dt
 			print(self.t)
-
+			
 			u_list.append(self.vx)
 			v_list.append(self.vy)
 			p_list.append(P)
