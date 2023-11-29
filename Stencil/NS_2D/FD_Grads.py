@@ -122,11 +122,12 @@ stencil_y =  stencil_y.view(1, 1, 3, 3, 3)
 stencil_xx = stencil_xx.view(1, 1, 3, 3, 3)
 stencil_yy =  stencil_yy.view(1, 1, 3, 3, 3)
 
-# deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor - nu*(F.conv(u_tensor, stencil_xx)[0,0]  + F.conv(u_tensor, stencil_yy)[0,0]) + F.conv(p_tensor, stencil_x)[0,0]
-# deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor - nu*(F.conv(v_tensor, stencil_xx)[0,0]  + F.conv(v_tensor, stencil_yy)[0,0]) + F.conv(p_tensor, stencil_y)[0,0]
+deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx)[0,0]  + F.conv3d(u_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
+deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx)[0,0]  + F.conv3d(v_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
 deriv_cont = F.conv3d(u_tensor, stencil_x)[0,0] + F.conv3d(v_tensor, stencil_y)[0,0]
 
-deriv_stencil = deriv_cont
+deriv_stencil =  deriv_cont
+deriv_stencil = deriv_stencil[0,0]
 # %%
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -137,7 +138,7 @@ plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace
 idx = 500
 ax = fig.add_subplot(3,2,1)
 pcm =ax.imshow(w[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
-ax.title.set_text('Numerical Soln. - W ')
+ax.title.set_text('Num. Soln. - W')
 ax.set_xlabel('x')
 ax.set_ylabel('t')
 divider = make_axes_locatable(ax)

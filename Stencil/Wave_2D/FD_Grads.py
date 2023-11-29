@@ -18,7 +18,7 @@ Initial Condition:
 """
 
 # %% 
-#Importing the necessary packages 
+#Importing the necessary packages s
 import numpy as np 
 import matplotlib.pyplot as plt 
 from tqdm import tqdm_gui
@@ -81,26 +81,25 @@ u_tensor =torch.tensor(u_sol, dtype=torch.float32).reshape(1,1,u_sol.shape[0], u
 alpha = 1/dt**2
 beta = 1/dx**2
 
-stencil_time = torch.zeros(3,3,3)
-stencil_t = alpha*torch.tensor([[0, 1, 0],
+#Standard
+three_point_stencil  = torch.tensor([[0, 1, 0],
                            [0, -2, 0],
                            [0, 1, 0]], dtype=torch.float32)
-                           
+
+stencil_time = torch.zeros(3,3,3)
+stencil_t = alpha*three_point_stencil
+
 stencil_time[:, 1, :] = stencil_t
 
 
 stencil_xx = torch.zeros(3,3,3)
-stencil_x = beta * torch.tensor([[0, 0, 0],
-                           [1, -2 , 1],
-                           [0, 0, 0]], dtype=torch.float32)
+stencil_x = beta * three_point_stencil.T
                            
 stencil_xx[1,: , :] = stencil_x
 
 
 stencil_yy = torch.zeros(3,3,3)
-stencil_y = beta * torch.tensor([[0, 0, 0],
-                           [1, -2 , 1],
-                           [0, 0, 0]], dtype=torch.float32)
+stencil_y = beta * three_point_stencil.T
                            
 stencil_yy[:, :, 1] = stencil_y
 
@@ -116,14 +115,14 @@ deriv_stencil = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stenc
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm 
 
-fig = plt.figure(figsize=(10, 8))
+fig = plt.figure(figsize=(8, 12))
 plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
 idx = 100
 ax = fig.add_subplot(3,2,1)
 pcm =ax.imshow(u_sol[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
 ax.title.set_text('Numerical Soln. ')
 ax.set_xlabel('x')
-ax.set_ylabel('t')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
@@ -143,7 +142,7 @@ ax = fig.add_subplot(3,2,3)
 pcm =ax.imshow(df_FD[idx][1:-1,1:-1], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
 ax.title.set_text('Handwritten')
 ax.set_xlabel('x')
-ax.set_ylabel('t')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
@@ -154,7 +153,7 @@ ax = fig.add_subplot(3,2,4)
 pcm =ax.imshow(deriv_stencil[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
 ax.title.set_text('Conv using Stencil')
 ax.set_xlabel('x')
-# ax.set_ylabel('t')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
@@ -173,5 +172,166 @@ cbar.formatter.set_powerlimits((0, 0))
 # ax.scatter(x, y, z, c=z, alpha=1)
 # plt.show()
 
+
+
+# %%
+# 5-point stencil
+import torch.nn.functional as F
+u_tensor =torch.tensor(u_sol, dtype=torch.float32).reshape(1,1,u_sol.shape[0], u_sol.shape[1], u_sol.shape[2])
+
+alpha = 1/(dt**2)
+beta = 1/(dx**2) #Standard
+beta = 1/((np.sqrt(2)*dx)**2) #skewed
+
+# #Standard
+# five_point_stencil  = torch.tensor([[0, 1, 0],
+#                            [1, -4, 1],
+#                            [0, 1, 0]], dtype=torch.float32)
+
+#Skewed http://brunoc69.xtreemhost.com/courses/WS05-06/numerikII/stencil.pdf?i=1
+five_point_stencil  = torch.tensor([[1, 0, 1],
+                           [0, -4, 0],
+                       [1, 0, 1]], dtype=torch.float32)
+
+
+
+stencil_time = torch.zeros(3,3,3)
+stencil_t = alpha*three_point_stencil
+                           
+stencil_time[:, 1, :] = stencil_t
+
+
+stencil_xy = torch.zeros(3,3,3)
+stencil_x = beta * five_point_stencil
+
+stencil_xy[1,: , :] = stencil_x
+# stencil_xy[:, :, 1] = stencil_x
+
+
+stencil_time = stencil_time.view(1, 1, 3, 3, 3)
+stencil_xy = stencil_xy.view(1, 1, 3, 3, 3)
+
+deriv_stencil_5 = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stencil_xy)[0,0]
+
+# %% 
+
+import torch.nn.functional as F
+u_tensor =torch.tensor(u_sol, dtype=torch.float32).reshape(1,1,u_sol.shape[0], u_sol.shape[1], u_sol.shape[2])
+
+alpha = 1/(dt**2)
+beta = 1/(12*dx**2)
+
+#Standard
+nine_point_stencil  = torch.tensor([
+                           [1, 1, 1],
+                           [1, -8, 1],
+                           [1, 1, 1]], dtype=torch.float32)
+# #Skewed
+# nine_point_stencil  = torch.tensor([
+#                            [1, 4, 1],
+#                            [4, -20, 4],
+#                            [1, 4, 1]], dtype=torch.float32)
+
+stencil_time = torch.zeros(3,3,3)
+stencil_t = alpha*three_point_stencil
+                           
+stencil_time[:, 1, :] = stencil_t
+
+
+stencil_xy = torch.zeros(3,3,3)
+stencil_x = beta * nine_point_stencil
+
+stencil_xy[1,: , :] = stencil_x
+# stencil_xy[:, :, 1] = stencil_x   
+
+
+stencil_time = stencil_time.view(1, 1, 3, 3, 3)
+stencil_xy = stencil_xy.view(1, 1, 3, 3, 3)
+
+deriv_stencil_9 = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stencil_xy)[0,0]
+
+# %%
+#Test Plots
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm 
+
+fig = plt.figure(figsize=(8, 12))
+plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+idx = 100
+ax = fig.add_subplot(3,2,1)
+pcm =ax.imshow(u_sol[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+ax.title.set_text('Numerical Soln. ')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+# ax = fig.add_subplot(3,2,2)
+# pcm =ax.imshow(u_sol, cmap=cm.coolwarm,extent=[-1.0, 1.0, -1.0, 1.0])
+# ax.title.set_text('Numerical')
+# ax.set_xlabel('x')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+#Handwritten
+ax = fig.add_subplot(3,2,3)
+pcm =ax.imshow(df_FD[idx][1:-1,1:-1], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+ax.title.set_text('Handwritten')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+#Stencils and Convolutions
+ax = fig.add_subplot(3,2,4)
+pcm =ax.imshow(deriv_stencil[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+ax.title.set_text('3 point Stencil - Individual')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+#Stencils and Convolutions
+ax = fig.add_subplot(3,2,5)
+pcm =ax.imshow(deriv_stencil_5[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+ax.title.set_text('5 point Stencil -Skewed')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+#Stencils and Convolutions
+ax = fig.add_subplot(3,2,6)
+pcm =ax.imshow(deriv_stencil_9[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+ax.title.set_text('9 point Stencil')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+# %% 
+#Visualising the 3D Tensor
+
+#Example structure: 
+# plt.rcParams["figure.figsize"] = [7.00, 3.50]
+# plt.rcParams["figure.autolayout"] = True
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# data = np.random.random(size=(3, 3, 3))
+# z, x, y = data.nonzero()
+# ax.scatter(x, y, z, c=z, alpha=1)
+# plt.show()
 
 # %%

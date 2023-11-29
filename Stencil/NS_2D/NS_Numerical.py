@@ -18,6 +18,20 @@ div(v) = 0
 
 import numpy as np
 import matplotlib.pyplot as plt
+import logging
+
+logger = logging.getLogger("test")
+logger.setLevel(level=logging.DEBUG)
+
+logFileFormatter = logging.Formatter(
+    fmt=f"%(levelname)s %(asctime)s (%(relativeCreated)d) \t %(pathname)s F%(funcName)s L%(lineno)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+fileHandler = logging.FileHandler(filename='test.log')
+fileHandler.setFormatter(logFileFormatter)
+fileHandler.setLevel(level=logging.INFO)
+
+logger.addHandler(fileHandler)
 # %% 
 #Solver Functions 
 
@@ -123,16 +137,25 @@ class Navier_Stokes_2d:
 			self.vx += -self.dt * dPx
 			self.vy += -self.dt * dPy
 
-			#Diffusion aolved Implcitly 
+			#Diffusion solved Implcitly 
 			self.vx = diffusion_solve(self.vx, self.dt , self.nu, self.kSq)
 			self.vy = diffusion_solve(self.vy, self.dt, self.nu, self.kSq)
 
 			#Vorticity
 			wz = curl(self.vx, self.vy, self.kx, self.ky)
 
+			#Continuity Residual
+			cont = np.sum(dvx_x + dvy_y)
+
 			#update time
 			self.t += self.dt
-			print(self.t)
+			print("Iteration: {}, Time: {}, Residuals {}".format(ii, self.t , cont))
+
+			if cont> 1: 
+				logger.error('Numerical instability occured ! ')
+			else:
+				logger.info("Iteration: {}, Time: {}, Residuals {}".format(ii, self.t , cont))
+
 			
 			u_list.append(self.vx)
 			v_list.append(self.vy)
@@ -143,7 +166,7 @@ class Navier_Stokes_2d:
 
 # %% 
 
-solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.001, 0.001, 1) # N, t, tEnd, dt, nu, L
+solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.0001, 0.001, 1) # N, tStart, tEnd, dt, nu, L
 u, v, p, w, x, t = solver.solve()
 
 # %% 
