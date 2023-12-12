@@ -91,7 +91,6 @@ stencil = beta * torch.tensor([[0, 0, 0],
                            
 stencil_x[1,: , :] = stencil
 
-
 stencil_y = torch.zeros(3,3,3)
 stencil = beta * torch.tensor([[0, 0, 0],
                            [-1, 0 , 1],
@@ -99,6 +98,10 @@ stencil = beta * torch.tensor([[0, 0, 0],
 
 stencil_y[:, :, 1] = stencil
 
+# #Combining the x and y gradients together. 
+# stencil_xy = torch.zeros(3,3,3)
+# stencil_xy[1, :, :] = stencil
+# stencil_xy[:, :, 1] = stencil
 
 stencil_xx = torch.zeros(3,3,3)
 stencil= gamma * torch.tensor([[0, 0, 0],
@@ -116,79 +119,102 @@ stencil = gamma * torch.tensor([[0, 0, 0],
 stencil_yy[:, :, 1] = stencil
 
 
+nine_point_stencil  = torch.tensor([
+                           [1, 1, 1],
+                           [1, -8, 1],
+                           [1, 1, 1]], dtype=torch.float32)
+
+
+stencil_xx_yy = torch.zeros(3,3,3)
+stencil = gamma * nine_point_stencil
+stencil_xx_yy[1,: , :] = stencil
+
 stencil_t = stencil_t.view(1, 1, 3, 3, 3)
 stencil_x = stencil_x.view(1, 1, 3, 3, 3)
 stencil_y =  stencil_y.view(1, 1, 3, 3, 3)
 stencil_xx = stencil_xx.view(1, 1, 3, 3, 3)
 stencil_yy =  stencil_yy.view(1, 1, 3, 3, 3)
+stencil_xx_yy =  stencil_xx_yy.view(1, 1, 3, 3, 3)
 
-deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx)[0,0]  + F.conv3d(u_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
-deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx)[0,0]  + F.conv3d(v_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
+# deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx)[0,0]  + F.conv3d(u_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
+# deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx)[0,0]  + F.conv3d(v_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
+
+deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
+deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
+
 deriv_cont = F.conv3d(u_tensor, stencil_x)[0,0] + F.conv3d(v_tensor, stencil_y)[0,0]
 
-deriv_stencil =  deriv_cont
-deriv_stencil = deriv_stencil[0,0]
+deriv_u = deriv_u[0,0]
+deriv_v = deriv_v[0,0]
+
+# deriv_stencil =  deriv_cont
+# deriv_stencil = deriv_stencil[0,0]
 # %%
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm 
 
 fig = plt.figure(figsize=(10, 8))
-plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.1, hspace=0.5)
 idx = 500
 ax = fig.add_subplot(3,2,1)
-pcm =ax.imshow(w[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
+pcm =ax.imshow(u[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Num. Soln. - U')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(3,2,2)
+pcm =ax.imshow(deriv_u[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('u_residual')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(3,2,3)
+pcm =ax.imshow(v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Num. Soln. - V')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(3,2,4)
+pcm =ax.imshow(deriv_v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('v_residual')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(3,2,5)
+pcm =ax.imshow(w[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
 ax.title.set_text('Num. Soln. - W')
 ax.set_xlabel('x')
-ax.set_ylabel('t')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
-# ax = fig.add_subplot(3,2,2)
-# pcm =ax.imshow(u_sol, cmap=cm.coolwarm,extent=[-1.0, 1.0, -1.0, 1.0])
-# ax.title.set_text('Numerical')
-# ax.set_xlabel('x')
-# divider = make_axes_locatable(ax)
-# cax = divider.append_axes("right", size="5%", pad=0.1)
-# cbar = fig.colorbar(pcm, cax=cax)
-# cbar.formatter.set_powerlimits((0, 0))
-
-# #Handwritten
-# ax = fig.add_subplot(3,2,3)
-# pcm =ax.imshow(df_FD[idx][1:-1,1:-1], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
-# ax.title.set_text('Handwritten')
-# ax.set_xlabel('x')
-# ax.set_ylabel('t')
-# divider = make_axes_locatable(ax)
-# cax = divider.append_axes("right", size="5%", pad=0.1)
-# cbar = fig.colorbar(pcm, cax=cax)
-# cbar.formatter.set_powerlimits((0, 0))
-
-#Stencils and Convolutions
-ax = fig.add_subplot(3,2,4)
-pcm =ax.imshow(deriv_stencil[idx], cmap=cm.coolwarm, extent=[-1.0, 1.0, -1.0, 1.0])
-ax.title.set_text('Conv using Stencil')
+ax = fig.add_subplot(3,2,6)
+pcm =ax.imshow(deriv_cont[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('w_residual')
 ax.set_xlabel('x')
-# ax.set_ylabel('t')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
-
-# %% 
-#Visualising the 3D Tensor
-
-#Example structure: 
-# plt.rcParams["figure.figsize"] = [7.00, 3.50]
-# plt.rcParams["figure.autolayout"] = True
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# data = np.random.random(size=(3, 3, 3))
-# z, x, y = data.nonzero()
-# ax.scatter(x, y, z, c=z, alpha=1)
-# plt.show()
-
 
 # %%

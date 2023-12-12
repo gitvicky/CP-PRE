@@ -166,7 +166,7 @@ class Navier_Stokes_2d:
 
 # %% 
 
-solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.0001, 0.001, 1) # N, tStart, tEnd, dt, nu, L
-u, v, p, w, x, t = solver.solve()
+# solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.0001, 0.001, 1) # N, tStart, tEnd, dt, nu, L
+# u, v, p, w, x, t = solver.solve()
 
 # %% 
