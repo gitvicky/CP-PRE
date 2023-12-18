@@ -26,7 +26,7 @@ import torch
 
 from NS_Numerical import *
 
-solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.001, 0.001, 1) # N, t, tEnd, dt, nu, L
+solver= Navier_Stokes_2d(400, 0.0, 1.0, 0.001, 0.001, 1, 1.0, 1.0) # N, t, tEnd, dt, nu, L, a , b  #(a and b are multiplier for the IC - ranging from 0.1 to 1, 1 being used by Philip)
 u, v, p, w, x, t = solver.solve()
 
 # %% 

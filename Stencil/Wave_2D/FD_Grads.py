@@ -33,7 +33,6 @@ Lambda = 20 #
 a = 0.25 #x-position of initial gaussian
 b = 0.25 #y-position of initial gaussian 
 
-
 solver = Wave_2D(Lambda, a , b)
 xx, yy, t, u_sol = solver.solve() #solution shape -> t, x, y
 
@@ -197,8 +196,6 @@ five_point_stencil  = torch.tensor([[1, 0, 1],
                            [0, -4, 0],
                        [1, 0, 1]], dtype=torch.float32)
 
-
-
 stencil_time = torch.zeros(3,3,3)
 stencil_t = alpha*three_point_stencil
                            
@@ -210,7 +207,6 @@ stencil_x = beta * five_point_stencil
 
 stencil_xy[1,: , :] = stencil_x
 # stencil_xy[:, :, 1] = stencil_x
-
 
 stencil_time = stencil_time.view(1, 1, 3, 3, 3)
 stencil_xy = stencil_xy.view(1, 1, 3, 3, 3)

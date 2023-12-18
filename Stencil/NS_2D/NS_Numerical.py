@@ -78,7 +78,7 @@ def apply_dealias(f, dealias):
 
 # %% 
 class Navier_Stokes_2d:
-	def __init__(self, N, t, tEnd, dt, nu, L):
+	def __init__(self, N, t, tEnd, dt, nu, L, a, b):
 		self.N = N
 		self.t = t
 		self.tEnd = tEnd
@@ -90,8 +90,8 @@ class Navier_Stokes_2d:
 		self.xlin = self.xlin[0:N]
 		self.xx, self.yy = np.meshgrid(self.xlin, self.xlin)
 
-		self.vx = -np.sin(2*np.pi*self.yy)
-		self.vy = np.sin(2*np.pi*self.xx*2)
+		self.vx = -np.sin(2*a*np.pi*self.yy)
+		self.vy = np.sin(2*b*np.pi*self.xx*2)
 
 		klin = 2*np.pi / self.L * np.arange(-self.N/2, self.N/2)
 		kmax = np.max(klin)
@@ -112,7 +112,7 @@ class Navier_Stokes_2d:
 		v_list = []
 		p_list = []
 		w_list = []
-
+		error = 0 
 		for ii in range(self.Nt):
 			
 			# Advection: rhs = -(v.grad)v
@@ -153,6 +153,8 @@ class Navier_Stokes_2d:
 
 			if cont> 1: 
 				logger.error('Numerical instability occured ! ')
+				error =1 
+				# break
 			else:
 				logger.info("Iteration: {}, Time: {}, Residuals {}".format(ii, self.t , cont))
 
@@ -162,7 +164,7 @@ class Navier_Stokes_2d:
 			p_list.append(P)
 			w_list.append(wz)
 
-		return np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(w_list), self.xlin, self.t
+		return np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(w_list), self.xlin, self.dt, error
 
 # %% 
 
