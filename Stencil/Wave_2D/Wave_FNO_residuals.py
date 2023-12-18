@@ -243,6 +243,7 @@ fig = plt.figure()
 mpl.rcParams['figure.figsize']=(12, 12)
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
 
+fig = plt.figure()
 ax = fig.add_subplot(2,2,1)
 pcm =ax.imshow(u_actual[...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
 ax.title.set_text('Actual')

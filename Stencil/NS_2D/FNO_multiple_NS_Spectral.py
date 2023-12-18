@@ -3,13 +3,12 @@
 """
 Created on 6 Jan 2023
 @author: vgopakum
-FNO modelled over the MHD data built using JOREK for multi-blob diffusion.
-
+FNO modelled over the spectral NS Turbulence datasets
 Multivariable FNO
 """
 # %%
 configuration = {"Case": 'NS Turbulence Spectral',
-                 "Field": 'u, v, w',
+                 "Field": 'u, v, p, w',
                  "Field_Mixing": 'Channel',
                  "Type": '2D Time',
                  "Epochs": 500,
@@ -29,7 +28,7 @@ configuration = {"Case": 'NS Turbulence Spectral',
                  "Modes": 16,
                  "Width_time": 32,  # FNO
                  "Width_vars": 0,  # U-Net
-                 "Variables": 3,
+                 "Variables": 4,
                  "Noise": 0.0,
                  "Loss Function": 'LP Loss',
                  "Spatial Resolution": 1,
@@ -197,81 +196,81 @@ class RangeNormalizer(object):
         self.b = self.b.cpu()
 
 
-# normalization, rangewise but single value.
-class MinMax_Normalizer(object):
-    def __init__(self, x, low=0.0, high=1.0):
-        super(MinMax_Normalizer, self).__init__()
-        min_u = torch.min(x[:, 0, :, :, :])
-        max_u = torch.max(x[:, 0, :, :, :])
+# # normalization, rangewise but single value.
+# class MinMax_Normalizer(object):
+#     def __init__(self, x, low=0.0, high=1.0):
+#         super(MinMax_Normalizer, self).__init__()
+#         min_u = torch.min(x[:, 0, :, :, :])
+#         max_u = torch.max(x[:, 0, :, :, :])
 
-        self.a_u = (high - low) / (max_u - min_u)
-        self.b_u = -self.a_u * max_u + high
+#         self.a_u = (high - low) / (max_u - min_u)
+#         self.b_u = -self.a_u * max_u + high
 
-        min_v = torch.min(x[:, 1, :, :, :])
-        max_v = torch.max(x[:, 1, :, :, :])
+#         min_v = torch.min(x[:, 1, :, :, :])
+#         max_v = torch.max(x[:, 1, :, :, :])
 
-        self.a_v = (high - low) / (max_v - min_v)
-        self.b_v = -self.a_v * max_v + high
+#         self.a_v = (high - low) / (max_v - min_v)
+#         self.b_v = -self.a_v * max_v + high
 
-        min_p = torch.min(x[:, 2, :, :, :])
-        max_p = torch.max(x[:, 2, :, :, :])
+#         min_p = torch.min(x[:, 2, :, :, :])
+#         max_p = torch.max(x[:, 2, :, :, :])
 
-        self.a_p = (high - low) / (max_p - min_p)
-        self.b_p = -self.a_p * max_p + high
+#         self.a_p = (high - low) / (max_p - min_p)
+#         self.b_p = -self.a_p * max_p + high
 
-        print(min_u, max_u, min_v, max_v, min_p, max_p)
+#         print(min_u, max_u, min_v, max_v, min_p, max_p)
 
-    def encode(self, x):
-        s = x.size()
+#     def encode(self, x):
+#         s = x.size()
 
-        u = x[:, 0, :, :, :]
-        u = self.a_u * u + self.b_u
+#         u = x[:, 0, :, :, :]
+#         u = self.a_u * u + self.b_u
 
-        v = x[:, 1, :, :, :]
-        v = self.a_v * v + self.b_v
+#         v = x[:, 1, :, :, :]
+#         v = self.a_v * v + self.b_v
 
-        p = x[:, 2, :, :, :]
-        p = self.a_p * p + self.b_p
+#         p = x[:, 2, :, :, :]
+#         p = self.a_p * p + self.b_p
 
-        x = torch.stack((u, v, p), dim=1)
+#         x = torch.stack((u, v, p), dim=1)
 
-        return x
+#         return x
 
-    def decode(self, x):
-        s = x.size()
+#     def decode(self, x):
+#         s = x.size()
 
-        u = x[:, 0, :, :, :]
-        u = (u - self.b_u) / self.a_u
+#         u = x[:, 0, :, :, :]
+#         u = (u - self.b_u) / self.a_u
 
-        v = x[:, 1, :, :, :]
-        v = (v - self.b_v) / self.a_v
+#         v = x[:, 1, :, :, :]
+#         v = (v - self.b_v) / self.a_v
 
-        p = x[:, 2, :, :, :]
-        p = (p - self.b_p) / self.a_p
+#         p = x[:, 2, :, :, :]
+#         p = (p - self.b_p) / self.a_p
 
-        x = torch.stack((u, v, p), dim=1)
+#         x = torch.stack((u, v, p), dim=1)
 
-        return x
+#         return x
 
-    def cuda(self):
-        self.a_u = self.a_u.cuda()
-        self.b_u = self.b_u.cuda()
+#     def cuda(self):
+#         self.a_u = self.a_u.cuda()
+#         self.b_u = self.b_u.cuda()
 
-        self.a_v = self.a_v.cuda()
-        self.b_v = self.b_v.cuda()
+#         self.a_v = self.a_v.cuda()
+#         self.b_v = self.b_v.cuda()
 
-        self.a_p = self.a_p.cuda()
-        self.b_p = self.b_p.cuda()
+#         self.a_p = self.a_p.cuda()
+#         self.b_p = self.b_p.cuda()
 
-    def cpu(self):
-        self.a_u = self.a_u.cpu()
-        self.b_u = self.b_u.cpu()
+#     def cpu(self):
+#         self.a_u = self.a_u.cpu()
+#         self.b_u = self.b_u.cpu()
 
-        self.a_v = self.a_v.cpu()
-        self.b_v = self.b_v.cpu()
+#         self.a_v = self.a_v.cpu()
+#         self.b_v = self.b_v.cpu()
 
-        self.a_p = self.a_p.cpu()
-        self.b_p = self.b_p.cpu()
+#         self.a_p = self.a_p.cpu()
+#         self.b_p = self.b_p.cpu()
 
 class LogNormalizer(object):
     def __init__(self, x,  low=0.0, high=1.0, eps=0.01):
@@ -351,37 +350,37 @@ class LogNormalizer(object):
         self.b_p = self.b_p.cpu()
 
 
-# #normalization, rangewise but across the full domain 
-# class MinMax_Normalizer(object):
-#     def __init__(self, x, low=-1.0, high=1.0):
-#         super(MinMax_Normalizer, self).__init__()
-#         mymin = torch.min(x)
-#         mymax = torch.max(x)
+#normalization, rangewise but across the full domain 
+class MinMax_Normalizer(object):
+    def __init__(self, x, low=-1.0, high=1.0):
+        super(MinMax_Normalizer, self).__init__()
+        mymin = torch.min(x)
+        mymax = torch.max(x)
 
-#         self.a = (high - low)/(mymax - mymin)
-#         self.b = -self.a*mymax + high
+        self.a = (high - low)/(mymax - mymin)
+        self.b = -self.a*mymax + high
 
-#     def encode(self, x):
-#         s = x.size()
-#         x = x.reshape(s[0], -1)
-#         x = self.a*x + self.b
-#         x = x.view(s)
-#         return x
+    def encode(self, x):
+        s = x.size()
+        x = x.reshape(s[0], -1)
+        x = self.a*x + self.b
+        x = x.view(s)
+        return x
 
-#     def decode(self, x):
-#         s = x.size()
-#         x = x.reshape(s[0], -1)
-#         x = (x - self.b)/self.a
-#         x = x.view(s)
-#         return x
+    def decode(self, x):
+        s = x.size()
+        x = x.reshape(s[0], -1)
+        x = (x - self.b)/self.a
+        x = x.view(s)
+        return x
 
-#     def cuda(self):
-#         self.a = self.a.cuda()
-#         self.b = self.b.cuda()
+    def cuda(self):
+        self.a = self.a.cuda()
+        self.b = self.b.cuda()
 
-#     def cpu(self):
-#         self.a = self.a.cpu()
-#         self.b = self.b.cpu()
+    def cpu(self):
+        self.a = self.a.cpu()
+        self.b = self.b.cpu()
 
 # %%
 ##################################
@@ -435,71 +434,6 @@ class LpLoss(object):
     def __call__(self, x, y):
         return self.rel(x, y)
 
-# class HsLoss(object):
-#     def __init__(self, d=2, p=2, k=1, a=None, group=False, size_average=True, reduction=True):
-#         super(HsLoss, self).__init__()
-
-#         #Dimension and Lp-norm type are postive
-#         assert d > 0 and p > 0
-
-#         self.d = d
-#         self.p = p
-#         self.k = k
-#         self.balanced = group
-#         self.reduction = reduction
-#         self.size_average = size_average
-
-#         if a == None:
-#             a = [1,] * k
-#         self.a = a
-
-#     def rel(self, x, y):
-#         num_examples = x.size()[0]
-#         diff_norms = torch.norm(x.reshape(num_examples,-1) - y.reshape(num_examples,-1), self.p, 1)
-#         y_norms = torch.norm(y.reshape(num_examples,-1), self.p, 1)
-#         if self.reduction:
-#             if self.size_average:
-#                 return torch.mean(diff_norms/y_norms)
-#             else:
-#                 return torch.sum(diff_norms/y_norms)
-#         return diff_norms/y_norms
-
-#     def __call__(self, x, y, a=None):
-#         nx = x.size()[1]
-#         ny = x.size()[2]
-#         k = self.k
-#         balanced = self.balanced
-#         a = self.a
-#         x = x.view(x.shape[0], nx, ny, -1)
-#         y = y.view(y.shape[0], nx, ny, -1)
-
-#         k_x = torch.cat((torch.arange(start=0, end=nx//2, step=1),torch.arange(start=-nx//2, end=0, step=1)), 0).reshape(nx,1).repeat(1,ny)
-#         k_y = torch.cat((torch.arange(start=0, end=ny//2, step=1),torch.arange(start=-ny//2, end=0, step=1)), 0).reshape(1,ny).repeat(nx,1)
-#         k_x = torch.abs(k_x).reshape(1,nx,ny,1).to(x.device)
-#         k_y = torch.abs(k_y).reshape(1,nx,ny,1).to(x.device)
-
-#         x = torch.fft.fftn(x, dim=[1, 2])
-#         y = torch.fft.fftn(y, dim=[1, 2])
-
-#         if balanced==False:
-#             weight = 1
-#             if k >= 1:
-#                 weight += a[0]**2 * (k_x**2 + k_y**2)
-#             if k >= 2:
-#                 weight += a[1]**2 * (k_x**4 + 2*k_x**2*k_y**2 + k_y**4)
-#             weight = torch.sqrt(weight)
-#             loss = self.rel(x*weight, y*weight)
-#         else:
-#             loss = self.rel(x, y)
-#             if k >= 1:
-#                 weight = a[0] * torch.sqrt(k_x**2 + k_y**2)
-#                 loss += self.rel(x*weight, y*weight)
-#             if k >= 2:
-#                 weight = a[1] * torch.sqrt(k_x**4 + 2*k_x**2*k_y**2 + k_y**4)
-#                 loss += self.rel(x*weight, y*weight)
-#             loss = loss / (k+1)
-
-#         return loss
 
 # %%
 # Extracting the configuration settings
@@ -522,8 +456,6 @@ num_vars = configuration['Variables']
 
 # %%
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
 
 
 # %%
@@ -608,8 +540,6 @@ class FNO2d(nn.Module):
 
 # %%
 
-
-
 class FNO_multi(nn.Module):
     def __init__(self, modes1, modes2, width_vars, width_time):
         super(FNO_multi, self).__init__()
@@ -680,23 +610,15 @@ class FNO_multi(nn.Module):
 
         return x
 
-    # Using x and y values from the simulation discretisation
+    # Arbitrary grid discretisation
     def get_grid(self, shape, device):
-        batchsize, num_vars, size_x, size_y = shape[0], shape[1], shape[2], shape[3]
-        gridx = torch.tensor(np.linspace(9.5, 10.5, size_x), dtype=torch.float)
-        gridx = gridx.reshape(1, 1, size_x, 1, 1).repeat([batchsize, num_vars, 1, size_y, 1])
-        gridy = torch.tensor(np.linspace(-0.5, 0.5, size_y), dtype=torch.float)
-        gridy = gridy.reshape(1, 1, 1, size_y, 1).repeat([batchsize, num_vars, size_x, 1, 1])
+        batchsize, self.num_vars, size_x, size_y = shape[0], shape[1], shape[2], shape[3]
+        gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
+        gridx = gridx.reshape(1, 1, size_x, 1, 1).repeat([batchsize, self.num_vars, 1, size_y, 1])
+        gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
+        gridy = gridy.reshape(1, 1, 1, size_y, 1).repeat([batchsize, self.num_vars, size_x, 1, 1])
         return torch.cat((gridx, gridy), dim=-1).to(device)
-
-    ## Arbitrary grid discretisation
-    # def get_grid(self, shape, device):
-    #     batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-    #     gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
-    #     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-    #     gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
-    #     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    #     return torch.cat((gridx, gridy), dim=-1).to(device)
+    
 
     def count_params(self):
         c = 0
@@ -715,16 +637,18 @@ class FNO_multi(nn.Module):
 data = data_loc + '/NS_Spectral_combined100.npz'
 # %%
 field = configuration['Field']
-dims = ['u', 'v', 'w']
+dims = ['u', 'v', 'p', 'w']
 num_vars = configuration['Variables']
 
 u_sol = np.load(data)['u'].astype(np.float32) 
 v_sol = np.load(data)['v'].astype(np.float32)
-p_sol = np.load(data)['w'].astype(np.float32)
+p_sol = np.load(data)['p'].astype(np.float32)
+w_sol = np.load(data)['w'].astype(np.float32)
 
 u_sol = np.nan_to_num(u_sol)
 v_sol = np.nan_to_num(v_sol)
 p_sol = np.nan_to_num(p_sol)
+w_sol = np.nan_to_num(w_sol)
 
 u = torch.from_numpy(u_sol)
 u = u.permute(0, 2, 3, 1)
@@ -735,13 +659,15 @@ v = v.permute(0, 2, 3, 1)
 p = torch.from_numpy(p_sol)
 p = p.permute(0, 2, 3, 1)
 
+w = torch.from_numpy(w_sol)
+w = w.permute(0, 2, 3, 1)
+
 t_res = configuration['Temporal Resolution']
 x_res = configuration['Spatial Resolution']
-uvp = torch.stack((u, v, p), dim=1)[:, ::t_res]
-# uvp = np.delete(uvp, (153, 229), axis=0)  # Outlier T values
+uvp = torch.stack((u, v, p, w), dim=1)[:, ::t_res]
 
 
-x_grid = np.load(data)['x'].astype(np.float32)
+x_grid = np.arange(0, 1, 0.0025)[::100]
 y_grid =x_grid
 t_grid = np.arange(0, len(u_sol), np.load(data)['dt'].astype(np.float32))
 
@@ -782,7 +708,7 @@ test_u_encoded = y_normalizer.encode(test_u)
 
 # %%
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_a, train_u), batch_size=batch_size,
-                                           shuffle=True)
+                                           shuffle=False)
 test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u_encoded), batch_size=batch_size,
                                           shuffle=False)
 
@@ -796,6 +722,7 @@ print('preprocessing finished, time used:', t2 - t1)
 ################################################################
 model = FNO_multi(modes, modes, width_vars, width_time)
 model.to(device)
+# model = model.load_state_dict(torch.load(os.getcwd() + '/Models/FNO_multi_blobs_taxonomic-magnification.pth', map_location='cpu'))
 
 run.update_metadata({'Number of Params': int(model.count_params())})
 
@@ -814,8 +741,8 @@ if torch.cuda.is_available():
     y_normalizer.cuda()
 
 # %%
-
-max_grad_clip_norm = configuration['Gradient Clipping Norm']
+    
+# max_grad_clip_norm = configuration['Gradient Clipping Norm']
 
 start_time = time.time()
 for ep in tqdm(range(epochs)):
@@ -829,7 +756,6 @@ for ep in tqdm(range(epochs)):
         xx = xx.to(device)
         yy = yy.to(device)
         y_old = xx[..., -step:]
-        # xx = additive_noise(xx)
 
         for t in range(0, T, step):
             y = yy[..., t:t + step]
@@ -950,8 +876,6 @@ run.update_metadata({'Training Time': float(train_time),
                      'MAE': float(MAE_error)
                     })
 
-pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
-
 pred_set_encoded = pred_set
 pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
 
@@ -989,15 +913,14 @@ for dim in range(num_vars):
 
     fig = plt.figure(figsize=plt.figaspect(0.5))
     ax = fig.add_subplot(2, 3, 1)
-    pcm = ax.imshow(u_field[dim, :, :, 0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    pcm = ax.imshow(u_field[dim, :, :, 0], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_1, vmax=v_max_1)
     # ax.title.set_text('Initial')
     ax.title.set_text('t=' + str(T_in))
     ax.set_ylabel('Solution')
     fig.colorbar(pcm, pad=0.05)
 
     ax = fig.add_subplot(2, 3, 2)
-    pcm = ax.imshow(u_field[dim, :, :, int(T / 2)], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                    vmax=v_max_2)
+    pcm = ax.imshow(u_field[dim, :, :, int(T / 2)], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_2, vmax=v_max_2)
     # ax.title.set_text('Middle')
     ax.title.set_text('t=' + str(int((T + T_in) / 2)))
     ax.axes.xaxis.set_ticks([])
@@ -1005,7 +928,7 @@ for dim in range(num_vars):
     fig.colorbar(pcm, pad=0.05)
 
     ax = fig.add_subplot(2, 3, 3)
-    pcm = ax.imshow(u_field[dim, :, :, -1], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    pcm = ax.imshow(u_field[dim, :, :, -1], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_3, vmax=v_max_3)
     # ax.title.set_text('Final')
     ax.title.set_text('t=' + str(T + T_in))
     ax.axes.xaxis.set_ticks([])
@@ -1015,27 +938,27 @@ for dim in range(num_vars):
     u_field = pred_set[idx]
 
     ax = fig.add_subplot(2, 3, 4)
-    pcm = ax.imshow(u_field[dim, :, :, 0], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    pcm = ax.imshow(u_field[dim, :, :, 0], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_1, vmax=v_max_1)
     ax.set_ylabel('FNO')
 
     fig.colorbar(pcm, pad=0.05)
 
     ax = fig.add_subplot(2, 3, 5)
-    pcm = ax.imshow(u_field[dim, :, :, int(T / 2)], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
+    pcm = ax.imshow(u_field[dim, :, :, int(T / 2)], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_2,
                     vmax=v_max_2)
     ax.axes.xaxis.set_ticks([])
     ax.axes.yaxis.set_ticks([])
     fig.colorbar(pcm, pad=0.05)
 
     ax = fig.add_subplot(2, 3, 6)
-    pcm = ax.imshow(u_field[dim, :, :, -1], cmap=cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    pcm = ax.imshow(u_field[dim, :, :, -1], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0], vmin=v_min_3, vmax=v_max_3)
     ax.axes.xaxis.set_ticks([])
     ax.axes.yaxis.set_ticks([])
     fig.colorbar(pcm, pad=0.05)
 
     plt.title(dims[dim])
 
-    output_plot.append(file_loc + '/Plots/MultiBlobs_' + dims[dim] + '_' + run.name + '.png')
+    output_plot.append(file_loc + '/Plots/Turbulence_' + dims[dim] + '_' + run.name + '.png')
     plt.savefig(output_plot[dim])
 
 # %%
