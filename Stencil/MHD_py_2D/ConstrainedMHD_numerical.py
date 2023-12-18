@@ -442,3 +442,4 @@ rho, u, v, p, bx, by, dt = solve(N, boxsize, tEnd)
 dx = boxsize/N
 
 # %%
+
