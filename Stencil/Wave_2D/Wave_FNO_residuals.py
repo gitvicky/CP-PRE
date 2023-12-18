@@ -114,31 +114,18 @@ output_size = configuration['Step']
 train_a = u[:ntrain,:,:,:T_in]
 train_u = u[:ntrain,:,:,T_in:T+T_in]
 
-# cal_a = u[ntrain:ntrain+ncal,:,:,:T_in]
-# cal_u = u[ntrain:ntrain+ncal,:,:,T_in:T+T_in]
-
-# pred_a = u[ntrain+ncal:ntrain+ncal+npred,:,:,:T_in]
-# pred_u = u[ntrain+ncal:ntrain+ncal+npred,:,:,T_in:T+T_in]
-
-
 t2 = default_timer()
 print('Data sorting finished, time used:', t2-t1)
 
 # %% 
-#Normalisation. 
+#Normalisation. - Setting up
 a_normalizer = MinMax_Normalizer(train_a)
-# train_a = a_normalizer.encode(train_a)
-# cal_a = a_normalizer.encode(cal_a)
-# pred_a = a_normalizer.encode(pred_a)
-
 y_normalizer = MinMax_Normalizer(train_u)
-# train_u = y_normalizer.encode(train_u)
-# cal_u = y_normalizer.encode(cal_u)
-# pred_u = y_normalizer.encode(pred_u)
+
 
 # %%
 #Load the model. 
-model = FNO2d(modes, modes, width, T_in, step, x, y)
+model = FNO_multi(modes, modes, width, T_in, step, 1,  x, y)
 # model.load_state_dict(torch.load(model_loc + 'FNO_Wave.pth', map_location='cpu'))
 model.load_state_dict(torch.load(model_loc + 'FNO_Wave_fundamental-steak.pth', map_location='cpu'))
 
@@ -164,9 +151,14 @@ pred_a = u_sol[:, ]
 pred_a = u_sol[:,:,:,:T_in]
 pred_u = u_sol[:,:,:,T_in:T+T_in]
 
+
 # %% 
 #Normalising the inputs 
 pred_a = y_normalizer.encode(pred_a)
+
+# %%
+pred_a = pred_a.unsqueeze(1)
+pred_u = pred_u.unsqueeze(1)
 # %% 
 #Obtaining the Predictions
 index = 0
@@ -191,11 +183,17 @@ pred_set = y_normalizer.decode(pred_set)
 
 # %% 
 #Estimating the Residuals 
-u_val = pred_u.permute(0, 3, 1, 2)
+
+pred_a = pred_a[:,0]
+pred_u = pred_u[:,0]
+pred_set = pred_set[:, 0]
+
+u_val = pred_set.permute(0, 3, 1, 2)
 u_tensor =torch.tensor(u_val, dtype=torch.float32).reshape(u_val.shape[0], 1, u_val.shape[1], u_val.shape[2], u_val.shape[3])
 
 alpha = 1/(dt**2)
 beta = 1/(12*dx**2)
+
 
 #Standard
 
