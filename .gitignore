@@ -17,6 +17,9 @@ Plots/
 *.file
 *.out
 
+#Log files
+*.log
+
 #Submission Script
 *.sh
 

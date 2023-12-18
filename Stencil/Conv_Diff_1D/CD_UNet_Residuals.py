@@ -3,7 +3,10 @@
 """
 
 1D U-Net built using PyTorch to model the 1D Burgers Equation. 
-Conformal Prediction using various Conformal Score estimates
+Estimating the physics residuals as a measure of UQ over a trained surrogate. 
+
+Equation: 
+    U_t + v U_x  - D*U_xx= 0
 
 """
 
@@ -140,13 +143,12 @@ pred_u = y_normalizer.encode(pred_u)
 #Loading the trained model. 
 model = UNet1d(T_in, step, width)
 model.load_state_dict(torch.load(model_loc + 'Unet_CD_mean_0.5.pth', map_location='cpu'))
-
+model.eval()
 # %%
 
 #Generating Test Data through some more numerical runs and then testing it on the surrogate.
 from pyDOE import lhs
 from CD_numerical import *
-
 
 dx = 0.05 #x discretisation
 dt = 0.0005 #t discretisation
@@ -178,9 +180,7 @@ pred_set = y_normalizer.decode(pred_set)
 
 # %% 
 #Estimating the Residuals 
-
-#Testing for a single simulation prediction only
-#Residual Estimations across the spatio-temporal tensor
+#Testing for a single simulation prediction only - Residual Estimations across the spatio-temporal tensor
 
 dx = 0.05
 dt = 0.0005
@@ -207,23 +207,6 @@ u_pred = pred_set[idx].numpy()
 u_mae = np.abs(u_actual - u_pred)
 u_mse = (u_actual - u_pred)**2
 
-u_t = np.gradient(u_pred, dt, edge_order=2, axis=0)
-u_x = np.gradient(u_pred, dx, edge_order=2, axis=1)
-u_xx = np.gradient(u_x, dx, edge_order=2, axis=1)
-
-D_x = np.gradient(D[idx], dx, edge_order=2, axis=0)
-c =params[idx, 1]
-u_residual_individual = u_t - D[idx]*u_x - u_pred*D_x + c*u_x 
-
-# grads = np.gradient(u_pred, dt, dx, axis=[0,1]) #Estimating gradients together
-# u_t = grads[0]
-# u_x = grads[1]
-u_residual_individual = u_t - D[idx]*u_x - u_pred*D_x + c*u_x 
-# grads = np.gradient(pred_set, dt, dx, axis=[1,2]) #Estimating gradients across the batch 
-# u_residua_together = grads[0][:, :] + v[80+idx]*grads[1][:, :]
-
-# %%
-# 
 # %% 
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -279,3 +262,5 @@ divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
+
+# %%
