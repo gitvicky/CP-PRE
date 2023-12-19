@@ -27,21 +27,21 @@ from ConstrainedMHD_numerical import *
 N = 128
 boxsize = 1.0
 tEnd = 0.5
-rho, u, v, p, bx, by, dt = solve(N, boxsize, tEnd)
+rho, u, v, p, Bx, By, dt = solve(N, boxsize, tEnd)
 dx = boxsize/N
 
 #Ignoring the varying dt for the time being 
 dt = np.mean(dt)
 #%%
-#Utilising the stencil by way of convolutions using pytorch 
+#Utilising the stencil By way of convolutions using pytorch 
 import torch.nn.functional as F
 
 rho_tensor =torch.tensor(rho, dtype=torch.float32).reshape(1,1, rho.shape[0], rho.shape[1], rho.shape[2])
 u_tensor =torch.tensor(u, dtype=torch.float32).reshape(1,1, u.shape[0], u.shape[1], u.shape[2])
 v_tensor =torch.tensor(v, dtype=torch.float32).reshape(1,1, v.shape[0], v.shape[1], v.shape[2])
 p_tensor =torch.tensor(p, dtype=torch.float32).reshape(1,1, p.shape[0], p.shape[1], p.shape[2])
-bx_tensor =torch.tensor(u, dtype=torch.float32).reshape(1,1, bx.shape[0], bx.shape[1], bx.shape[2])
-by_tensor =torch.tensor(u, dtype=torch.float32).reshape(1,1, by.shape[0], by.shape[1], by.shape[2])
+Bx_tensor =torch.tensor(Bx, dtype=torch.float32).reshape(1,1, Bx.shape[0], Bx.shape[1], Bx.shape[2])
+By_tensor =torch.tensor(By, dtype=torch.float32).reshape(1,1, By.shape[0], By.shape[1], By.shape[2])
 
 alpha = 1/dt*2
 beta = 1/dx*2
@@ -114,7 +114,8 @@ stencil_xx_yy =  stencil_xx_yy.view(1, 1, 3, 3, 3)
 # deriv_u = deriv_u[0,0]
 # deriv_v = deriv_v[0,0]
 
-div_B = F.conv3d(bx_tensor, stencil_x) + F.conv3d(by_tensor, stencil_y)
+div_B = F.conv3d(Bx_tensor, stencil_x) + F.conv3d(By_tensor, stencil_y)
+div_B = div_B[0,0]
 # %%
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -122,10 +123,10 @@ from matplotlib import cm
 
 fig = plt.figure(figsize=(10, 8))
 plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.1, hspace=0.5)
-idx = 500
+idx = -1
 ax = fig.add_subplot(3,2,1)
-pcm =ax.imshow(u[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Num. Soln. - U')
+pcm =ax.imshow(Bx[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Num. Soln. - Bx')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -134,8 +135,8 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(3,2,2)
-pcm =ax.imshow(deriv_u[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('u_residual')
+pcm =ax.imshow(div_B[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Div B')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -143,44 +144,47 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(3,2,3)
-pcm =ax.imshow(v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Num. Soln. - V')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(3,2,4)
-pcm =ax.imshow(deriv_v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('v_residual')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# ax = fig.add_subplot(3,2,3)
+# pcm =ax.imshow(v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('Num. Soln. - V')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(3,2,5)
-pcm =ax.imshow(w[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Num. Soln. - W')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# ax = fig.add_subplot(3,2,4)
+# pcm =ax.imshow(deriv_v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('v_residual')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(3,2,6)
-pcm =ax.imshow(deriv_cont[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('w_residual')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# ax = fig.add_subplot(3,2,5)
+# pcm =ax.imshow(w[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('Num. Soln. - W')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+# ax = fig.add_subplot(3,2,6)
+# pcm =ax.imshow(deriv_cont[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('w_residual')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
+
+# # %%
 
 # %%

@@ -41,7 +41,7 @@ configuration = {"Case": 'NS Turbulence Spectral',
 
 # %%
 from simvue import Run
-run = Run()
+run = Run(mode='disabled')
 run.init(folder="/Conformal_Prediction", tags=['Conformal Prediction', 'MultiVariable', "Z_Li", "Skip-connect", "Diff", "Recon"], metadata=configuration)
 
 # %%
@@ -86,7 +86,8 @@ np.random.seed(0)
 # %%
 path = os.getcwd()
 data_loc = '/rds/project/iris_vol2/rds-ukaea-ap001/ir-gopa2/Data'
-# model_loc = os.path.dirname(os.path.dirname(os.getcwd()))
+data_loc = path + '/Data'
+model_loc = path + '/Models'
 file_loc = os.getcwd()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -722,7 +723,7 @@ print('preprocessing finished, time used:', t2 - t1)
 ################################################################
 model = FNO_multi(modes, modes, width_vars, width_time)
 model.to(device)
-# model = model.load_state_dict(torch.load(os.getcwd() + '/Models/FNO_multi_blobs_taxonomic-magnification.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_multi_blobs_sad-hawk.pth', map_location='cpu'))
 
 run.update_metadata({'Number of Params': int(model.count_params())})
 
@@ -958,8 +959,8 @@ for dim in range(num_vars):
 
     plt.title(dims[dim])
 
-    output_plot.append(file_loc + '/Plots/Turbulence_' + dims[dim] + '_' + run.name + '.png')
-    plt.savefig(output_plot[dim])
+    # output_plot.append(file_loc + '/Plots/Turbulence_' + dims[dim] + '_' + run.name + '.png')
+    # plt.savefig(output_plot[dim])
 
 # %%
 

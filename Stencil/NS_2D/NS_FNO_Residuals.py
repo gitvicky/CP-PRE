@@ -209,8 +209,9 @@ print('preprocessing finished, time used:', t2 - t1)
 ################################################################
 #Loading the model
 ################################################################
-model = FNO_multi(modes, modes, width_time, T_in, step, num_vars, x_grid, y_grid)
-model.load_state_dict(torch.load(model_loc + '/FNO_multi_blobs_resonnt-mayonnaise.pth', map_location='cpu'))
+
+model = FNO_multi(modes, modes, width_time, num_vars, T_in, step, x_grid, y_grid)
+model.load_state_dict(torch.load(model_loc + '/FNO_multi_blobs_sad-hawk.pth', map_location='cpu'))
 model.to(device)
 model.eval()
 
@@ -409,10 +410,12 @@ run.close()
 #Utilising the stencil by way of convolutions using pytorch 
 import torch.nn.functional as F
 
-u = pred_set[idx][0]
-v = pred_set[idx][1]
-p = pred_set[idx][2]
-w = pred_set[idx][3]
+fields = pred_set
+
+u = fields[idx][0]
+v = fields[idx][1]
+p = fields[idx][2]
+w = fields[idx][3]
 
 
 u_tensor =torch.tensor(u, dtype=torch.float32).reshape(1,1, u.shape[0], u.shape[1], u.shape[2])
@@ -490,7 +493,7 @@ deriv_cont = F.conv3d(u_tensor, stencil_x)[0,0] + F.conv3d(v_tensor, stencil_y)
 deriv_u = deriv_u
 deriv_v = deriv_v
 
-deriv_stencil_conv = torch.cat((deriv_u, deriv_v, deriv_v), dim=1)
+deriv_stencil_conv = torch.cat((deriv_u, deriv_v, deriv_cont), dim=1)
 # %%
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -503,7 +506,7 @@ u_pred = pred_set[idx].numpy()
 u_mae = np.abs(u_actual - u_pred)
 u_residual = deriv_stencil_conv[idx].numpy()
 
-for ii in range(num_vars):
+for ii in [0,1,3]:
     fig = plt.figure()
     mpl.rcParams['figure.figsize']=(12, 12)
 
@@ -540,6 +543,9 @@ for ii in range(num_vars):
     cbar.formatter.set_powerlimits((0, 0))
 
     #Residual Error 
+    if ii ==3:
+        ii = 2
+
     ax = fig.add_subplot(2,2,4)
     pcm =ax.imshow(u_residual[ii,...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
     ax.title.set_text('Residual')

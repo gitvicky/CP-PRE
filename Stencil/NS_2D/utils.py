@@ -662,8 +662,9 @@ class FNO2d(nn.Module):
         x = F.gelu(x)
         return x
 
+
 class FNO_multi(nn.Module):
-    def __init__(self, modes1, modes2, width_time, T_in, step, num_vars, x_grid, y_grid, do=False):
+    def __init__(self, modes1, modes2, width_time, num_vars, T_in, step, x_grid, y_grid):
         super(FNO_multi, self).__init__()
 
         """
@@ -683,10 +684,14 @@ class FNO_multi(nn.Module):
         self.modes2 = modes2
         self.width_time = width_time
         self.num_vars = num_vars
+        self.T_in = T_in
+        self.step = step
         self.x_grid = x_grid
         self.y_grid = y_grid
 
-        self.fc0_time = nn.Linear(T_in + 2, self.width_time)
+        self.fc0_time = nn.Linear(self.T_in + 2, self.width_time)
+
+        # self.padding = 8 # pad the domain if input is non-periodic
 
         self.f0 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
         self.f1 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
@@ -695,15 +700,11 @@ class FNO_multi(nn.Module):
         self.f4 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
         self.f5 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
 
+        # self.norm = nn.InstanceNorm2d(self.width)
+        self.norm = nn.Identity()
 
         self.fc1_time = nn.Linear(self.width_time, 256)
-        self.fc2_time = nn.Linear(256, step)
-
-        if do == False:
-            self.dropout = nn.Identity()
-        else: 
-            self.dropout = nn.Dropout(p=do)
-
+        self.fc2_time = nn.Linear(256, self.step)
 
     def forward(self, x):
         grid = self.get_grid(x.shape, x.device)
@@ -712,38 +713,33 @@ class FNO_multi(nn.Module):
         x = self.fc0_time(x)
         x = x.permute(0, 4, 1, 2, 3)
         grid = grid.permute(0, 4, 1, 2, 3)
+        # x = self.dropout(x)
 
-        x = self.f0(x, grid)
-        x = self.dropout(x) #Dropout
+        # x = F.pad(x, [0,self.padding, 0,self.padding]) # pad the domain if input is non-periodic
 
-        x = self.f1(x, grid)
-        x = self.dropout(x) #Dropout
+        x0 = self.f0(x, grid)
+        x = self.f1(x0, grid)
+        x = self.f2(x, grid) + x0
+        x1 = self.f3(x, grid)
+        x = self.f4(x1, grid)
+        x = self.f5(x, grid) + x1
+        # x = self.dropout(x)
 
-        x = self.f2(x, grid) 
-        x = self.dropout(x) #Dropout
-        
-        x = self.f3(x, grid)
-        x = self.dropout(x) #Dropout
-        
-        x = self.f4(x, grid)
-        x = self.dropout(x) #Dropout
-        
-        x = self.f5(x, grid) 
-        x = self.dropout(x) #Dropout
-
+        # x = x[..., :-self.padding, :-self.padding] # pad the domain if input is non-periodic
 
         x = x.permute(0, 2, 3, 4, 1)
         x = x
 
         x = self.fc1_time(x)
         x = F.gelu(x)
+        # x = self.dropout(x)
         x = self.fc2_time(x)
 
         return x
-    
+
     # Arbitrary grid discretisation
     def get_grid(self, shape, device):
-        batchsize, num_vars, size_x, size_y = shape[0], shape[1], shape[2], shape[3]
+        batchsize, self.num_vars, size_x, size_y = shape[0], shape[1], shape[2], shape[3]
         gridx = torch.tensor(np.linspace(0, 1, size_x), dtype=torch.float)
         gridx = gridx.reshape(1, 1, size_x, 1, 1).repeat([batchsize, self.num_vars, 1, size_y, 1])
         gridy = torch.tensor(np.linspace(0, 1, size_y), dtype=torch.float)
