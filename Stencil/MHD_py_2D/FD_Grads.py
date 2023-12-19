@@ -27,7 +27,10 @@ from ConstrainedMHD_numerical import *
 N = 128
 boxsize = 1.0
 tEnd = 0.5
-rho, u, v, p, Bx, By, dt = solve(N, boxsize, tEnd)
+a = 1.0 #u IC params [0.5, 1]
+b = 1.0 #v IC params [0.5, 1]
+c = 0.5 #p IC params [0.5, 1]
+rho, u, v, p, Bx, By, dt = solve(N, boxsize, tEnd, a, b, c)
 dx = boxsize/N
 
 gamma = torch.tensor(5/3, dtype=torch.float32)
@@ -121,32 +124,31 @@ div_B = F.conv3d(Bx_tensor, stencil_x) + F.conv3d(By_tensor, stencil_y)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm 
 
-field = p
-deriv = deriv_P[0,0]
+# field = p
+# deriv = deriv_P[0,0]
 
-fig = plt.figure(figsize=(10, 8))
-plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.1, hspace=0.5)
-idx = -1
-ax = fig.add_subplot(3,2,1)
-pcm =ax.imshow(field[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Num. Soln.')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# fig = plt.figure(figsize=(10, 8))
+# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.1, hspace=0.5)
+# idx = -1
+# ax = fig.add_subplot(3,2,1)
+# pcm =ax.imshow(field[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('Num. Soln.')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(3,2,2)
-pcm =ax.imshow(deriv[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Residual')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
-
+# ax = fig.add_subplot(3,2,2)
+# pcm =ax.imshow(deriv[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
+# ax.title.set_text('Residual')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
 # ax = fig.add_subplot(3,2,3)
 # pcm =ax.imshow(v[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
@@ -190,4 +192,40 @@ cbar.formatter.set_powerlimits((0, 0))
 
 # # %%
 
+# %%
+# %% 
+import matplotlib as mpl
+
+fig = plt.figure()
+mpl.rcParams['figure.figsize']=(12, 30)
+num_vars = 6
+vars = ['rho', 'u', 'v', 'P', 'Bx', 'By']
+fields = [rho[...,1:-1, 1:-1, 1:-1], u[...,1:-1, 1:-1, 1:-1], v[...,1:-1, 1:-1, 1:-1], p[...,1:-1, 1:-1, 1:-1], Bx[...,1:-1, 1:-1, 1:-1], By[...,1:-1, 1:-1, 1:-1]]
+derivs = [deriv_rho, deriv_u, deriv_v, deriv_P, deriv_Bx, deriv_By]
+idx = -1 
+for ii, field in enumerate(fields):
+    jj = ii+ii+1
+    
+    ax = fig.add_subplot(6,2,jj)
+    pcm =ax.imshow(field[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+    ax.title.set_text("Num. Soln. - " + vars[ii])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = fig.colorbar(pcm, cax=cax)
+    cbar.formatter.set_powerlimits((0, 0))
+
+    ax = fig.add_subplot(6,2,jj+1)
+    pcm =ax.imshow(derivs[ii][0,0][idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
+    ax.title.set_text('Residual - ' + vars[ii])
+    ax.set_xticks([])
+    ax.set_yticks([])
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = fig.colorbar(pcm, cax=cax)
 # %%
