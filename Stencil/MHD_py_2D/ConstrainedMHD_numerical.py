@@ -427,8 +427,8 @@ def solve(N, L, tEnd):
 		u_list.append(vx)
 		v_list.append(vy)
 		p_list.append(P)
-		bx_list.append(bx)
-		by_list.append(by)
+		bx_list.append(Bx)
+		by_list.append(By)
 		dt_list.append(dt)
 
 	return np.asarray(rho_list), np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(bx_list), np.asarray(by_list), np.asarray(dt_list)

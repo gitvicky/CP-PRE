@@ -30,6 +30,10 @@ tEnd = 0.5
 rho, u, v, p, Bx, By, dt = solve(N, boxsize, tEnd)
 dx = boxsize/N
 
+gamma = torch.tensor(5/3, dtype=torch.float32)
+p_gas = p - 0.5*(Bx**2 + By**2)
+
+
 #Ignoring the varying dt for the time being 
 dt = np.mean(dt)
 #%%
@@ -42,6 +46,7 @@ v_tensor =torch.tensor(v, dtype=torch.float32).reshape(1,1, v.shape[0], v.shape[
 p_tensor =torch.tensor(p, dtype=torch.float32).reshape(1,1, p.shape[0], p.shape[1], p.shape[2])
 Bx_tensor =torch.tensor(Bx, dtype=torch.float32).reshape(1,1, Bx.shape[0], Bx.shape[1], Bx.shape[2])
 By_tensor =torch.tensor(By, dtype=torch.float32).reshape(1,1, By.shape[0], By.shape[1], By.shape[2])
+p_gas_tensor = torch.tensor(p_gas, dtype=torch.float32).reshape(1,1, p_gas.shape[0], p_gas.shape[1], p_gas.shape[2])
 
 alpha = 1/dt*2
 beta = 1/dx*2
@@ -103,30 +108,28 @@ stencil_xx = stencil_xx.view(1, 1, 3, 3, 3)
 stencil_yy =  stencil_yy.view(1, 1, 3, 3, 3)
 stencil_xx_yy =  stencil_xx_yy.view(1, 1, 3, 3, 3)
 
-# deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx)[0,0]  + F.conv3d(u_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
-# deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx)[0,0]  + F.conv3d(v_tensor, stencil_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
-
-# deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(u_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(u_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(u_tensor, stencil_xx_yy)[0,0]) + F.conv3d(p_tensor, stencil_x)[0,0]
-# deriv_v = F.conv3d(u_tensor, stencil_t)[0,0] + F.conv3d(v_tensor, stencil_x)[0,0]*u_tensor[...,1:-1, 1:-1, 1:-1] + F.conv3d(v_tensor, stencil_x)[0,0]*v_tensor[...,1:-1, 1:-1, 1:-1]  - nu*(F.conv3d(v_tensor, stencil_xx_yy)[0,0]) + F.conv3d(p_tensor, stencil_y)[0,0]
-
-# deriv_cont = F.conv3d(u_tensor, stencil_x)[0,0] + F.conv3d(v_tensor, stencil_y)[0,0]
-
-# deriv_u = deriv_u[0,0]
-# deriv_v = deriv_v[0,0]
+deriv_rho = F.conv3d(rho_tensor, stencil_t)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(rho_tensor, stencil_t)[0,0] + rho_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(rho_tensor, stencil_y)[0,0] + rho_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_y)
+deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] + (1/rho_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(p_tensor, stencil_x)[0,0] -2*(Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_y)[0,0] - (By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_y)[0,0] - (Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0]
+deriv_v = F.conv3d(v_tensor, stencil_t)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_x)[0,0] + (1/rho_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(p_tensor, stencil_y)[0,0] -2*(By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_y)[0,0] - (By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] - (Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0]
+deriv_P = F.conv3d(p_tensor, stencil_t)[0,0] + (gamma*p_gas_tensor[...,1:-1, 1:-1, 1:-1] + By_tensor[...,1:-1, 1:-1, 1:-1]**2)  * F.conv3d(u_tensor, stencil_x)[0,0]  - Bx_tensor[...,1:-1, 1:-1, 1:-1] * By_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_x)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(p_tensor, stencil_x)[0,0] + (gamma -2)*(Bx_tensor[...,1:-1, 1:-1, 1:-1]*u_tensor[...,1:-1, 1:-1, 1:-1] + By_tensor[...,1:-1, 1:-1, 1:-1]*v_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(Bx_tensor, stencil_x)[0,0] -  By_tensor[...,1:-1, 1:-1, 1:-1] * Bx_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_y)[0,0] + (gamma*p_gas_tensor[...,1:-1, 1:-1, 1:-1] + Bx_tensor[...,1:-1, 1:-1, 1:-1]**2)  * F.conv3d(v_tensor, stencil_y)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(p_tensor, stencil_y)[0,0] + (gamma -2)*(Bx_tensor[...,1:-1, 1:-1, 1:-1]*u_tensor[...,1:-1, 1:-1, 1:-1] + By_tensor[...,1:-1, 1:-1, 1:-1]*v_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(By_tensor, stencil_y)[0,0]
+deriv_Bx = F.conv3d(Bx_tensor, stencil_t)[0,0] - By_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_y)[0,0] + Bx_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_y)[0,0] - v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_y)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0]
+deriv_By = F.conv3d(By_tensor, stencil_t)[0,0] + By_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] - Bx_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_x)[0,0] - v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_x)[0,0]
 
 div_B = F.conv3d(Bx_tensor, stencil_x) + F.conv3d(By_tensor, stencil_y)
-div_B = div_B[0,0]
 # %%
 #Test Plots
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm 
 
+field = p
+deriv = deriv_P[0,0]
+
 fig = plt.figure(figsize=(10, 8))
 plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.1, hspace=0.5)
 idx = -1
 ax = fig.add_subplot(3,2,1)
-pcm =ax.imshow(Bx[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Num. Soln. - Bx')
+pcm =ax.imshow(field[idx], cmap=cm.coolwarm, extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Num. Soln.')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -135,8 +138,8 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(3,2,2)
-pcm =ax.imshow(div_B[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
-ax.title.set_text('Div B')
+pcm =ax.imshow(deriv[idx], cmap=cm.coolwarm,extent=[0.0, 1.0, 0.0, 1.0])
+ax.title.set_text('Residual')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
