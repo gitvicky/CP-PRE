@@ -288,7 +288,7 @@ def getFlux(rho_L, rho_R, vx_L, vx_R, vy_L, vy_R, P_L, P_R, Bx_L, Bx_R, By_L, By
 
 
 
-def solve(N, L, tEnd):
+def solve(N, L, tEnd, a=1, b=1, c=1): #a,b,care parameterisations for the initial conditions for u,v,p
 	""" Finite Volume simulation """
 	
 	rho_list = []
@@ -320,9 +320,9 @@ def solve(N, L, tEnd):
 	
 	# Generate Initial Conditions
 	rho = (gamma**2/(4*np.pi)) * np.ones(X.shape)
-	vx = -np.sin(2*np.pi*Y)
-	vy =  np.sin(2*np.pi*X)
-	P = (gamma/(4*np.pi)) * np.ones(X.shape)  # init. gas pressure 
+	vx = -np.sin(a*2*np.pi*Y)
+	vy =  np.sin(b*2*np.pi*X)
+	P = (gamma/(c*4*np.pi)) * np.ones(X.shape)  # init. gas pressure 
 	
 	# magnetic field IC
 	# (Az is at top-right node of each cell)
@@ -438,7 +438,8 @@ def solve(N, L, tEnd):
 N = 128
 boxsize = 1.0
 tEnd = 0.5
-rho, u, v, p, bx, by, dt = solve(N, boxsize, tEnd)
+a, b, c = 1.0, 1.0, 1.0
+rho, u, v, p, bx, by, dt = solve(N, boxsize, tEnd, a, b, c)
 dx = boxsize/N
 
 # %%
