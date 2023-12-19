@@ -355,7 +355,7 @@ class constrainedTransport_MHD:
 		self.Mass, self.Momx, self.Momy, self.Energy = getConserved(self.rho, self.vx, self.vy, self.P, self.Bx, self.By, self.gamma, self.vol)
 
 	def solve(self):
-
+		err = 0 
 		rho_list = []
 		u_list = []
 		v_list = []
@@ -427,7 +427,11 @@ class constrainedTransport_MHD:
 
 			#Check Div B
 			divB = getDiv(self.bx, self.by, self.dx)
-			print("t= ", self.t, ", mean |divB| = ", np.mean(np.abs(divB)))
+			mean_divB = np.mean((np.abs(divB)))
+			print("t= ", self.t, ", mean |divB| = ", mean_divB)
+
+			if divB > 1 : 
+				err = 1
 
 			rho_list.append(self.rho)
 			u_list.append(self.vx)
@@ -437,8 +441,8 @@ class constrainedTransport_MHD:
 			by_list.append(self.by)
 
 
-		return np.asarray(rho_list), np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(bx_list), np.asarray(by_list)
+		return np.asarray(rho_list), np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(bx_list), np.asarray(by_list), err
 
 # %% 
-solver= constrainedTransport_MHD(128, 1.0, 0.5) # N, L, tEnd
+solver= constrainedTransport_MHD(128, 1.0, 0.5, 1.0, 1.0, 1.0) # N, L, tEnd, a, b, c
 rho, u, v, p, bx, by = solver.solve()

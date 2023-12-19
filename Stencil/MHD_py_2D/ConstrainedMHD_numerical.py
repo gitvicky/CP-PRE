@@ -298,6 +298,7 @@ def solve(N, L, tEnd, a=1, b=1, c=1): #a,b,care parameterisations for the initia
 	bx_list = []
 	by_list = []
 	dt_list = []
+	err = 0 
 
 	# Simulation parameters
 	N                      = N # resolution
@@ -406,7 +407,11 @@ def solve(N, L, tEnd, a=1, b=1, c=1): #a,b,care parameterisations for the initia
 		
 		# check div B
 		divB = getDiv(bx,by,dx)
-		print("t = ", t, ", mean |divB| = ", np.mean(np.abs(divB)))
+		mean_divB = np.mean(np.abs(divB))
+		print("t = ", t, ", mean |divB| = ", mean_divB)
+
+		if mean_divB > 0 : 
+			err = 0
 		
 		# plot in real time
 		if (plotRealTime and plotThisTurn) or (t >= tEnd):
@@ -421,7 +426,6 @@ def solve(N, L, tEnd, a=1, b=1, c=1): #a,b,care parameterisations for the initia
 			plt.pause(0.001)
 			outputCount += 1
 			
-	
 
 		rho_list.append(rho)
 		u_list.append(vx)
@@ -431,16 +435,16 @@ def solve(N, L, tEnd, a=1, b=1, c=1): #a,b,care parameterisations for the initia
 		by_list.append(By)
 		dt_list.append(dt)
 
-	return np.asarray(rho_list), np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(bx_list), np.asarray(by_list), np.asarray(dt_list)
+	return np.asarray(rho_list), np.asarray(u_list), np.asarray(v_list), np.asarray(p_list), np.asarray(bx_list), np.asarray(by_list), np.asarray(dt_list), err
 
 
 # %%
-N = 128
-boxsize = 1.0
-tEnd = 0.5
-a, b, c = 1.0, 1.0, 1.0
-rho, u, v, p, bx, by, dt = solve(N, boxsize, tEnd, a, b, c)
-dx = boxsize/N
+# N = 128
+# boxsize = 1.0
+# tEnd = 0.5
+# a, b, c = 1.0, 1.0, 1.0
+# rho, u, v, p, bx, by, dt, err = solve(N, boxsize, tEnd, a, b, c)
+# dx = boxsize/N
 
 # %%
 

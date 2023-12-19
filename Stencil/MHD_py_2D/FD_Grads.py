@@ -30,7 +30,7 @@ tEnd = 0.5
 a = 1.0 #u IC params [0.5, 1]
 b = 1.0 #v IC params [0.5, 1]
 c = 0.5 #p IC params [0.5, 1]
-rho, u, v, p, Bx, By, dt = solve(N, boxsize, tEnd, a, b, c)
+rho, u, v, p, Bx, By, dt, err = solve(N, boxsize, tEnd, a, b, c)
 dx = boxsize/N
 
 gamma = torch.tensor(5/3, dtype=torch.float32)
