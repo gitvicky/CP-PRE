@@ -37,8 +37,8 @@ gamma = torch.tensor(5/3, dtype=torch.float32)
 p_gas = p - 0.5*(Bx**2 + By**2)
 
 
-#Ignoring the varying dt for the time being 
-dt = np.mean(dt)
+#Ignoring the varying dt for the time being --- Needs to be fixed !! 
+dt = np.mean(dt) 
 #%%
 #Utilising the stencil By way of convolutions using pytorch 
 import torch.nn.functional as F
@@ -198,6 +198,7 @@ import matplotlib as mpl
 
 fig = plt.figure()
 mpl.rcParams['figure.figsize']=(12, 30)
+plt.figure()
 num_vars = 6
 vars = ['rho', 'u', 'v', 'P', 'Bx', 'By']
 fields = [rho[...,1:-1, 1:-1, 1:-1], u[...,1:-1, 1:-1, 1:-1], v[...,1:-1, 1:-1, 1:-1], p[...,1:-1, 1:-1, 1:-1], Bx[...,1:-1, 1:-1, 1:-1], By[...,1:-1, 1:-1, 1:-1]]

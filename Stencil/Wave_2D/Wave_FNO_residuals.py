@@ -235,8 +235,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 idx = 0
 t_idx = -1
 
-u_actual = pred_u[idx].numpy()
-u_pred = pred_set[idx].numpy()
+u_actual = pred_u[idx][...,1:-1, 1:-1, 1:-1].numpy()
+u_pred = pred_set[idx][...,1:-1, 1:-1, 1:-1].numpy()
 u_mae = np.abs(u_actual - u_pred)
 
 fig = plt.figure()
