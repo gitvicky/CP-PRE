@@ -328,13 +328,7 @@ pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
 
 # %%
 # Plotting the comparison plots
-
-idx = np.random.randint(0, ntest)
-idx = 0
-
-if configuration['Log Normalisation'] == 'Yes':
-    test_u = torch.exp(test_u)
-    pred_set = torch.exp(pred_set)
+idx = 2
 
 # %%
 output_plot = []
@@ -445,6 +439,7 @@ p = fields[idx][3]
 Bx = fields[idx][4]
 By = fields[idx][5]
 
+
 gamma = torch.tensor(5/3, dtype=torch.float32)
 p_gas = p - 0.5*(Bx**2 + By**2)
 
@@ -456,6 +451,13 @@ Bx_tensor =torch.tensor(Bx, dtype=torch.float32).reshape(1,1, Bx.shape[0], Bx.sh
 By_tensor =torch.tensor(By, dtype=torch.float32).reshape(1,1, By.shape[0], By.shape[1], By.shape[2])
 p_gas_tensor = torch.tensor(p_gas, dtype=torch.float32).reshape(1,1, p_gas.shape[0], p_gas.shape[1], p_gas.shape[2])
 
+# rho_tensor = rho_tensor.permute(0,1,4,2,3)
+# u_tensor = u_tensor.permute(0,1,4,2,3)
+# v_tensor = v_tensor.permute(0,1,4,2,3)
+# p_tensor = p_tensor.permute(0,1,4,2,3)
+# Bx_tensor = Bx_tensor.permute(0,1,4,2,3)
+# By_tensor = By_tensor.permute(0,1,4,2,3)
+# p_gas_tensor = p_gas_tensor.permute(0,1,4,2,3)
 
 alpha = 1/dt*2
 beta = 1/dx*2
@@ -488,8 +490,6 @@ stencil_t = stencil_t.view(1, 1, 3, 3, 3)
 stencil_x = stencil_x.view(1, 1, 3, 3, 3)
 stencil_y =  stencil_y.view(1, 1, 3, 3, 3)
 
-
-
 deriv_rho = F.conv3d(rho_tensor, stencil_t)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(rho_tensor, stencil_t)[0,0] + rho_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(rho_tensor, stencil_y)[0,0] + rho_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_y)
 deriv_u = F.conv3d(u_tensor, stencil_t)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] + (1/rho_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(p_tensor, stencil_x)[0,0] -2*(Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_y)[0,0] - (By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_y)[0,0] - (Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0]
 deriv_v = F.conv3d(v_tensor, stencil_t)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_x)[0,0] + (1/rho_tensor[...,1:-1, 1:-1, 1:-1]) * F.conv3d(p_tensor, stencil_y)[0,0] -2*(By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0] + v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_y)[0,0] - (By_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] - (Bx_tensor/rho_tensor)[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_y)[0,0]
@@ -498,6 +498,7 @@ deriv_Bx = F.conv3d(Bx_tensor, stencil_t)[0,0] - By_tensor[...,1:-1, 1:-1, 1:-1]
 deriv_By = F.conv3d(By_tensor, stencil_t)[0,0] + By_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(u_tensor, stencil_x)[0,0] - Bx_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(v_tensor, stencil_x)[0,0] - v_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(Bx_tensor, stencil_x)[0,0] + u_tensor[...,1:-1, 1:-1, 1:-1] * F.conv3d(By_tensor, stencil_x)[0,0]
 
 div_B = F.conv3d(Bx_tensor, stencil_x) + F.conv3d(By_tensor, stencil_y)
+
 deriv_stencil_conv = torch.cat((deriv_rho, deriv_u, deriv_v, deriv_P, deriv_Bx, deriv_By), dim=1)
 # %%
 #Test Plots

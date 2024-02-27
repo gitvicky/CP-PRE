@@ -185,3 +185,29 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 # %%
+
+fig = plt.figure(figsize=(10, 8))
+plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+
+ax = fig.add_subplot(2,1,1)
+pcm =ax.imshow(u_sol, cmap=cm.coolwarm, extent=[0.0, 10.0, 2.5, 0])
+ax.title.set_text('Num. Soln. ')
+ax.set_xlabel('x')
+ax.set_ylabel('t')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+
+ax = fig.add_subplot(2,1,2)
+pcm =ax.imshow(deriv_stencil_conv, cmap=cm.coolwarm, extent=[0.0, 10.0, 2.5, 0])
+ax.title.set_text('Conv using Stencil')
+ax.set_xlabel('x')
+ax.set_ylabel('t')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+# %%

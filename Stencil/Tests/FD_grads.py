@@ -211,7 +211,7 @@ cbar.formatter.set_powerlimits((0, 0))
 # %%
 #If the stencil was invertible, trying out the transposed convolution
 
-#Slightly modified stencil to make it invertible -- Seeing if doing a transposed convolution could on the inverse of the convolution kernel will help retrieve the field. 
+#Slightly modified stencil to make it invertible (unrealistic stencil) -- Seeing if doing a transposed convolution could on the inverse of the convolution kernel will help retrieve the field. 
 stencil = torch.tensor([[1., -1./(2), 0.],
                            [-1./(2), 0., 1./(2*dx)],
                            [1., 1./(2), 0.]])
