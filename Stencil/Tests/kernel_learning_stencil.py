@@ -20,6 +20,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pyDOE import lhs
 from tqdm import tqdm 
+
+seed = np.random.randint(1e6)
+torch.manual_seed(seed)
+np.random.seed(seed)
+
+#Setting up CUDA
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 # %% 
 #Generating the datasets: Performing the Laplace Operator over a range of ICs. 
 #This will be the training input
@@ -41,8 +49,8 @@ def generate_IC(N):
         u_ic.append(np.exp(amp[ii]*((xx-x_pos[ii])**2 + (yy-y_pos[ii])**2)))
     return np.asarray(u_ic)
 
-N = 10000
-uu = generate_IC(N)
+N_samples = 10000
+uu = generate_IC(N_samples)
 uu = torch.Tensor(uu)
 
 # %% 
@@ -74,11 +82,27 @@ class conv_laplace(nn.Module):
         return x
     
 
+# %% 
+#Setting up simvue 
+from simvue import Run
+
+configuration = {"Case": 'Forward',
+                 "Epochs": 1000,
+                 "Batch Size": 100,
+                 "Optimizer": 'Adam',
+                 "Learning Rate": 1e-3,
+                 "Scheduler Step": 100,
+                 "Scheduler Gamma": 0.5,
+}
+
+run = Run()
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Convolutional Kernel', 'FD Stencil, ''Wave'], metadata=configuration)
+
 learnt_laplace = conv_laplace()
 
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
-optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=1e-3)
-
+optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
 # %% 
 #Prepping the data. 
 X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
@@ -86,10 +110,9 @@ Y_train = uu_laplace
 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=100, shuffle=True)
 
-
 # %% 
 #Training the Convolutional Network 
-epochs = 1000
+epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
@@ -98,15 +121,11 @@ for ii in tqdm(range(epochs)):
         loss = loss_func(y_out, yy)
         loss.backward()
         optimizer.step()
-    loss_val.append(loss.item())
+        scheduler.step()
+    run.log_metrics({'Train Loss': loss.item()})
 
-torch.save(learnt_laplace, "learnt_laplace.pth")
-plt.plot(np.arange(1, epochs+1), np.asarray(loss_val))
-plt.xlabel("Epochs")
-plt.ylabel("MSE Loss")
-plt.title("Training Loss")
+run.save(learnt_laplace.conv.weight.detach().numpy(), 'learnt_forward_stencil.npy')
 
-print(learnt_laplace.conv.weight)
 
 # %%
 #Plotting and comparing 
@@ -153,6 +172,8 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
+run.save(fig, 'FD_Stencils.png')
+
 # %% 
 #Learning the inverse of the laplace 
 
@@ -171,9 +192,20 @@ class transp_conv_inv_laplace(nn.Module):
 
 inv_laplace = transp_conv_inv_laplace()
 
+configuration = {"Case": 'Inverse',
+                 "Epochs": 5000,
+                 "Batch Size": 100,
+                 "Optimizer": 'Adam',
+                 "Learning Rate": 5e-3,
+                 "Scheduler Step": 1000,
+                 "Scheduler Gamma": 0.5,
+}
+run = Run()
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Convolutional Kernel', 'FD Stencil, ''Wave'], metadata=configuration)
+
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
-optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
 # %% 
 #Prepping the data. 
 X_train = uu_laplace
@@ -183,7 +215,7 @@ train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_trai
 
 # %% 
 #Training the Transposed Convolutional Network 
-epochs = 1000
+epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
@@ -193,13 +225,10 @@ for ii in tqdm(range(epochs)):
         loss.backward()
         optimizer.step()
         scheduler.step()
-    loss_val.append(loss.item())
+    run.log_metrics({'Train Loss': loss.item()})
 
-torch.save(inv_laplace, "inv_laplace.pth")
-plt.plot(np.arange(1, epochs+1), np.asarray(loss_val))
-plt.xlabel("Epochs")
-plt.ylabel("MSE Loss")
-plt.title("Training Loss")
+run.save(inv_laplace.conv.weight.detach().numpy(), 'learnt_inverse_stencil.npy')
+
 
 # %%
 fig = plt.figure(figsize=(10, 5))
@@ -245,5 +274,7 @@ divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
+
+run.save(fig, 'FD_Stencils.png')
 
 # %%
