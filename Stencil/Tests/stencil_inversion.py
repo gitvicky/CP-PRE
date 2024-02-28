@@ -1,4 +1,4 @@
-#Testing out the stencil inversion methods
+#Testing out the stencil inversion methods on the numerical solver itself. using an arbitrary stencil 
 
 # %%
 import numpy as np 
@@ -40,9 +40,9 @@ kernel_transp = kernel.T
 #Testing out to see if the inverse of the kernel 
 #used for transposed convolution could retreieve the original. 
 
-conv = F.conv2d(uu.view(1,1,uu.shape[0], uu.shape[1]), kernel.view(1,1,3,3,))
-inv_conv = F.conv_transpose2d(conv, kernel_inv.view(1,1,3,3,))
-transposed_conv = F.conv_transpose2d(conv, kernel_transp.view(1,1,3,3,))
+conv = F.conv2d(uu.view(1,1,uu.shape[0], uu.shape[1]), kernel.view(1,1,3,3,)) #Performing the convolution on the solution
+inv_conv = F.conv_transpose2d(conv, kernel_inv.view(1,1,3,3,)) #Tranposed convolution on the previously convolved solution using kernel inverse
+transposed_conv = F.conv_transpose2d(conv, kernel_transp.view(1,1,3,3,)) #Tranposed convolution on the previously convolved solution using kernel tranpose
 
 # %%
 #Plotting the conv and inv_conv
@@ -51,7 +51,7 @@ from matplotlib import cm
 
 fig = plt.figure(figsize=(20, 5))
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
-plt.title('Arbitrary stencil')
+# plt.title('Arbitrary stencil')
 ax = fig.add_subplot(1,3,1)
 pcm =ax.imshow(uu, cmap=cm.coolwarm)
 ax.title.set_text('Actual')
