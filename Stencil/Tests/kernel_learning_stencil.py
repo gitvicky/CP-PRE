@@ -112,8 +112,27 @@ print(learnt_laplace.conv.weight)
 #Plotting and comparing 
 
 fig = plt.figure(figsize=(10, 5))
+
+mini = torch.min(yy[-1,0])
+maxi = torch.max(yy[-1,0])
+
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
 plt.title('FD stencil')
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
 ax = fig.add_subplot(1,2,1)
 pcm =ax.imshow(yy[-1,0], cmap=cm.coolwarm)
 ax.title.set_text('Actual Kernel')
@@ -153,8 +172,8 @@ class transp_conv_inv_laplace(nn.Module):
 inv_laplace = transp_conv_inv_laplace()
 
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
-optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=1e-3)
-
+optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 # %% 
 #Prepping the data. 
 X_train = uu_laplace
@@ -162,9 +181,8 @@ Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=1000, shuffle=True)
 
-
 # %% 
-#Training the Convolutional Network 
+#Training the Transposed Convolutional Network 
 epochs = 1000
 loss_val = []
 for ii in tqdm(range(epochs)):    
@@ -174,6 +192,7 @@ for ii in tqdm(range(epochs)):
         loss = loss_func(y_out, yy)
         loss.backward()
         optimizer.step()
+        scheduler.step()
     loss_val.append(loss.item())
 
 torch.save(inv_laplace, "inv_laplace.pth")
@@ -184,20 +203,41 @@ plt.title("Training Loss")
 
 # %%
 fig = plt.figure(figsize=(10, 5))
+
+mini = torch.min(yy[-1,0][1:-1, 1:-1])
+maxi = torch.max(yy[-1,0][1:-1, 1:-1])
+
+
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
 plt.title('Inverse FD stencil')
+
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
 ax = fig.add_subplot(1,2,1)
-pcm =ax.imshow(yy[-1,0][:, :, 1:-1, 1:-1], cmap=cm.coolwarm)
+pcm =ax.imshow(yy[-1,0][1:-1, 1:-1], cmap=cm.coolwarm, vmin=mini, vmax=maxi)
 ax.title.set_text('Actual Field')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm)
+pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
 ax.title.set_text('Retrieved Field')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
