@@ -13,6 +13,7 @@ Using the wave equation as the base test case for this experiment.
 # %% 
 import numpy as np 
 import matplotlib.pyplot as plt 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm 
 import torch 
 import torch.nn as nn
@@ -49,8 +50,8 @@ uu = torch.Tensor(uu)
 #This will be the training target
 def laplace_stencil(X):    
     laplace_kernel = torch.tensor([[0., 1., 0.],
-                           [1., -4., 1.],
-                           [0, 1., 0.]])
+                                   [1., -4., 1.],
+                                   [0, 1., 0.]])
     
     conv = F.conv2d(X.view(X.shape[0], 1, X.shape[1], X.shape[2]), laplace_kernel.view(1,1,3,3))
     return conv
@@ -69,7 +70,7 @@ class conv_laplace(nn.Module):
         self.conv = nn.Conv2d(1, 1, (3,3), stride=1)
 
     def forward(self, x):
-        x =self.conv(x)
+        x = self.conv(x)
         return x
     
 
@@ -83,7 +84,7 @@ optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=1e-3)
 X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
 Y_train = uu_laplace
 
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=1000, shuffle=True)
+train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=100, shuffle=True)
 
 
 # %% 
@@ -104,6 +105,34 @@ plt.plot(np.arange(1, epochs+1), np.asarray(loss_val))
 plt.xlabel("Epochs")
 plt.ylabel("MSE Loss")
 plt.title("Training Loss")
+
+print(learnt_laplace.conv.weight)
+
+# %%
+#Plotting and comparing 
+
+fig = plt.figure(figsize=(10, 5))
+# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+plt.title('FD stencil')
+ax = fig.add_subplot(1,2,1)
+pcm =ax.imshow(yy[-1,0], cmap=cm.coolwarm)
+ax.title.set_text('Actual Kernel')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(1,2,2)
+pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm)
+ax.title.set_text('Learnt Kernel')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
 
 # %% 
 #Learning the inverse of the laplace 
@@ -129,27 +158,52 @@ optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=1e-3)
 # %% 
 #Prepping the data. 
 X_train = uu_laplace
-Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
+Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=1000, shuffle=True)
 
 
 # %% 
 #Training the Convolutional Network 
-epochs = 10000
+epochs = 1000
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
         optimizer.zero_grad()
-        y_out = inv_laplace(xx)
+        y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
         loss = loss_func(y_out, yy)
         loss.backward()
         optimizer.step()
     loss_val.append(loss.item())
 
-torch.save(learnt_laplace, "inv_laplace.pth")
+torch.save(inv_laplace, "inv_laplace.pth")
 plt.plot(np.arange(1, epochs+1), np.asarray(loss_val))
 plt.xlabel("Epochs")
 plt.ylabel("MSE Loss")
 plt.title("Training Loss")
-# %% 
+
+# %%
+fig = plt.figure(figsize=(10, 5))
+# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+plt.title('Inverse FD stencil')
+ax = fig.add_subplot(1,2,1)
+pcm =ax.imshow(yy[-1,0][:, :, 1:-1, 1:-1], cmap=cm.coolwarm)
+ax.title.set_text('Actual Field')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(1,2,2)
+pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm)
+ax.title.set_text('Retrieved Field')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+# %%
