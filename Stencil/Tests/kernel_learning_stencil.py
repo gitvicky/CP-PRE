@@ -11,6 +11,7 @@ Using the wave equation as the base test case for this experiment.
 """
 
 # %% 
+import os
 import numpy as np 
 import matplotlib.pyplot as plt 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -96,7 +97,7 @@ configuration = {"Case": 'Forward',
 }
 
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Convolutional Kernel', 'FD Stencil, ''Wave'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Convolutional Kernel', 'FD Stencil', 'Wave'], metadata=configuration)
 
 learnt_laplace = conv_laplace()
 
@@ -124,8 +125,7 @@ for ii in tqdm(range(epochs)):
         scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
-run.save(learnt_laplace.conv.weight.detach().numpy(), 'learnt_forward_stencil.npy')
-
+run.save(learnt_laplace.conv.weight.detach().numpy(), 'output', name='learnt_forward_stencil.npy')
 
 # %%
 #Plotting and comparing 
@@ -172,8 +172,16 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
-run.save(fig, 'FD_Stencils.png')
+#Saving the images
+# run.save(fig, 'output', name='FD_Stencils.png')
 
+#Saving the Code
+run.save(os.path.abspath(__file__), 'code')
+
+#Closing the run. 
+run.close()
+
+# %%
 # %% 
 #Learning the inverse of the laplace 
 
@@ -201,7 +209,7 @@ configuration = {"Case": 'Inverse',
                  "Scheduler Gamma": 0.5,
 }
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Convolutional Kernel', 'FD Stencil, ''Wave'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Convolutional Kernel', 'FD Stencil','Wave'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
 optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
@@ -227,7 +235,7 @@ for ii in tqdm(range(epochs)):
         scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
-run.save(inv_laplace.conv.weight.detach().numpy(), 'learnt_inverse_stencil.npy')
+run.save(inv_laplace.transp_conv.weight.detach().numpy(), 'output', name='learnt_inverse_stencil.npy')
 
 
 # %%
@@ -275,6 +283,12 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
-run.save(fig, 'FD_Stencils.png')
+#Saving the Image 
+# run.save(fig, 'output', name='Inverse_Stencils.png')
 
+#Saving the Code
+run.save(os.path.abspath(__file__), 'code')
+
+#Closing the simvue run. 
+run.close()
 # %%
