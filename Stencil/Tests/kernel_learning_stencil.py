@@ -276,7 +276,7 @@ ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
-# cbar.formatter.set_powerlimits((0, 0))
+cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,2,2)
 pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
