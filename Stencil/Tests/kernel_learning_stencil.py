@@ -22,7 +22,7 @@ import torch.nn.functional as F
 from pyDOE import lhs
 from tqdm import tqdm 
 
-seed = np.random.randint(1e6)
+seed = np.random.randint(1000)
 torch.manual_seed(seed)
 np.random.seed(seed)
 
@@ -81,15 +81,15 @@ class conv_laplace(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         return x
-    
+         
 
 # %% 
 #Setting up simvue 
 from simvue import Run
 
 configuration = {"Case": 'Forward',
-                 "Epochs": 10,
-                 "Batch Size": 100,
+                 "Epochs": 1000,
+                 "Batch Size": 1000,
                  "Optimizer": 'Adam',
                  "Learning Rate": 1e-3,
                  "Scheduler Step": 100,
@@ -97,7 +97,7 @@ configuration = {"Case": 'Forward',
 }
 
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Convolutional Kernel', 'FD Stencil', 'Wave'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Adam', 'FD'], metadata=configuration)
 
 learnt_laplace = conv_laplace().to(device)
 
@@ -109,7 +109,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['
 X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
 Y_train = uu_laplace
 
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=100, shuffle=True)
+train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
 # %% 
 #Training the Convolutional Network 
@@ -132,7 +132,6 @@ run.save(learnt_laplace.conv.weight.detach().cpu().numpy(), 'output', name='lear
 #Plotting and comparing 
 
 fig = plt.figure(figsize=(10, 5))
-# fig, axs = plt.subplots(2, 1)
 
 mini = torch.min(yy[-1,0])
 maxi = torch.max(yy[-1,0])
@@ -174,8 +173,11 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
+
 #Saving the images
-run.save(plt.gcf(), fig, 'output', name='FD_Stencils')
+plt.savefig('laplace.png')
+run.save(os.getcwd() + '/laplace.png', 'output')
+# run.save(plt.gcf(), 'output', name='FD_Stencils')
 
 #Saving the Code
 run.save(os.path.abspath(__file__), 'code')
@@ -204,14 +206,14 @@ inv_laplace = transp_conv_inv_laplace().to(device)
 
 configuration = {"Case": 'Inverse',
                  "Epochs": 5000,
-                 "Batch Size": 100,
+                 "Batch Size": 1000,
                  "Optimizer": 'Adam',
                  "Learning Rate": 5e-3,
                  "Scheduler Step": 1000,
                  "Scheduler Gamma": 0.5,
 }
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Convolutional Kernel', 'FD Stencil','Wave'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Adam', 'FD'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
 optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
@@ -221,7 +223,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['
 X_train = uu_laplace
 Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
 
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=1000, shuffle=True)
+train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
 # %% 
 #Training the Transposed Convolutional Network 
@@ -287,7 +289,11 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 #Saving the Image 
-# run.save(fig, 'output', name='Inverse_Stencils.png')
+
+#Saving the images
+plt.savefig('inverse_laplace.png')
+run.save(os.getcwd() + '/inverse_laplace.png', 'output')
+# run.save(plt.gcf(), 'output', name='FD_Stencils')
 
 #Saving the Code
 run.save(os.path.abspath(__file__), 'code')
