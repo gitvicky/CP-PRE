@@ -88,7 +88,7 @@ class conv_laplace(nn.Module):
 from simvue import Run
 
 configuration = {"Case": 'Forward',
-                 "Epochs": 1000,
+                 "Epochs": 10,
                  "Batch Size": 100,
                  "Optimizer": 'Adam',
                  "Learning Rate": 1e-3,
@@ -99,7 +99,7 @@ configuration = {"Case": 'Forward',
 run = Run()
 run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Convolutional Kernel', 'FD Stencil', 'Wave'], metadata=configuration)
 
-learnt_laplace = conv_laplace()
+learnt_laplace = conv_laplace().to(device)
 
 loss_func = torch.nn.MSELoss() #LogitsLoss contains the sigmoid layer - provides numerical stability. 
 optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
@@ -117,6 +117,7 @@ epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
+        xx, yy = xx.to(device), yy.to(device)
         optimizer.zero_grad()
         y_out = learnt_laplace(xx)
         loss = loss_func(y_out, yy)
@@ -125,12 +126,13 @@ for ii in tqdm(range(epochs)):
         scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
-run.save(learnt_laplace.conv.weight.detach().numpy(), 'output', name='learnt_forward_stencil.npy')
+run.save(learnt_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
 
 # %%
 #Plotting and comparing 
 
 fig = plt.figure(figsize=(10, 5))
+# fig, axs = plt.subplots(2, 1)
 
 mini = torch.min(yy[-1,0])
 maxi = torch.max(yy[-1,0])
@@ -153,7 +155,7 @@ plt.gca().spines['left'].set_visible(False)
 
 
 ax = fig.add_subplot(1,2,1)
-pcm =ax.imshow(yy[-1,0], cmap=cm.coolwarm)
+pcm =ax.imshow(yy[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm)
 ax.title.set_text('Actual Kernel')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -163,7 +165,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm)
+pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm)
 ax.title.set_text('Learnt Kernel')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -173,7 +175,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 #Saving the images
-# run.save(fig, 'output', name='FD_Stencils.png')
+run.save(plt.gcf(), fig, 'output', name='FD_Stencils')
 
 #Saving the Code
 run.save(os.path.abspath(__file__), 'code')
@@ -198,7 +200,7 @@ class transp_conv_inv_laplace(nn.Module):
         return x
     
 
-inv_laplace = transp_conv_inv_laplace()
+inv_laplace = transp_conv_inv_laplace().to(device)
 
 configuration = {"Case": 'Inverse',
                  "Epochs": 5000,
@@ -227,6 +229,7 @@ epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
+        xx, yy = xx.to(device), yy.to(device)
         optimizer.zero_grad()
         y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
         loss = loss_func(y_out, yy)
@@ -235,7 +238,7 @@ for ii in tqdm(range(epochs)):
         scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
-run.save(inv_laplace.transp_conv.weight.detach().numpy(), 'output', name='learnt_inverse_stencil.npy')
+run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
 
 
 # %%
@@ -264,7 +267,7 @@ plt.gca().spines['left'].set_visible(False)
 
 
 ax = fig.add_subplot(1,2,1)
-pcm =ax.imshow(yy[-1,0][1:-1, 1:-1], cmap=cm.coolwarm, vmin=mini, vmax=maxi)
+pcm =ax.imshow(yy[-1,0][1:-1, 1:-1].detach().cpu().numpy(), cmap=cm.coolwarm, vmin=mini, vmax=maxi)
 ax.title.set_text('Actual Field')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -274,7 +277,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 # cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(y_out[-1,0].detach().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
+pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
 ax.title.set_text('Retrieved Field')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
