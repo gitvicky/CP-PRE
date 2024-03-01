@@ -3,7 +3,7 @@
 """
 28th Feb, 2023
 
-Learning the required Convolutional Kernels 
+Learning the required Convolutional Kernels using LBFGS 
     1. Try and learn the finite difference stencil for performing the residual estimation
     2. If we are able to retrieve the FD stencils, attempt tp learnt the TranspConv kernel that maps from the residual to the field. 
 
@@ -22,7 +22,8 @@ import torch.nn.functional as F
 from pyDOE import lhs
 from tqdm import tqdm 
 
-seed = np.random.randint(1000)
+# seed = np.random.randint(1000)
+seed = 42
 torch.manual_seed(seed)
 np.random.seed(seed)
 
@@ -90,20 +91,16 @@ from simvue import Run
 configuration = {"Case": 'Forward',
                  "Epochs": 1000,
                  "Batch Size": 1000,
-                 "Optimizer": 'Adam',
-                 "Learning Rate": 1e-3,
-                 "Scheduler Step": 100,
-                 "Scheduler Gamma": 0.5,
+                 "Optimizer": 'LBFGS'
 }
 
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Adam', 'FD'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'LBFGS', 'FD'], metadata=configuration)
 
 learnt_laplace = conv_laplace().to(device)
 
 loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+optimizer = torch.optim.LBFGS(learnt_laplace.parameters(), history_size=10, max_iter=4)
 # %% 
 #Prepping the data. 
 X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
@@ -112,18 +109,32 @@ Y_train = uu_laplace
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
 # %% 
+for input, target in dataset:
+    def closure():
+        optimizer.zero_grad()
+        output = model(input)
+        loss = loss_fn(output, target)
+        loss.backward()
+        return loss
+    optimizer.step(closure)
+
+
+
+def closure():
+    optimizer.zero_grad()
+    y_out = learnt_laplace(xx)
+    loss = loss_func(y_out, yy)
+    loss.backward()
+    return loss
+
 #Training the Convolutional Network 
 epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
         xx, yy = xx.to(device), yy.to(device)
-        optimizer.zero_grad()
-        y_out = learnt_laplace(xx)
-        loss = loss_func(y_out, yy)
-        loss.backward()
+        loss = closure()        
         optimizer.step()
-        scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
 run.save(learnt_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
@@ -184,120 +195,3 @@ run.save(os.path.abspath(__file__), 'code')
 
 #Closing the run. 
 run.close()
-
-# %%
-# %% 
-#Learning the inverse of the laplace 
-
-# 1D tranposed convolution for the inverse laplace
-class transp_conv_inv_laplace(nn.Module):
-    def __init__(self, activation=None):
-        super(transp_conv_inv_laplace, self).__init__()
-
-        #Convolutional Layers
-        self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
-
-    def forward(self, x):
-        x =self.transp_conv(x)
-        return x
-    
-
-inv_laplace = transp_conv_inv_laplace().to(device)
-
-configuration = {"Case": 'Inverse',
-                 "Epochs": 5000,
-                 "Batch Size": 1000,
-                 "Optimizer": 'Adam',
-                 "Learning Rate": 5e-3,
-                 "Scheduler Step": 1000,
-                 "Scheduler Gamma": 0.5,
-}
-run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Adam', 'FD'], metadata=configuration)
-
-loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
-# %% 
-#Prepping the data. 
-X_train = uu_laplace
-Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
-
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
-
-# %% 
-#Training the Transposed Convolutional Network 
-epochs = configuration['Epochs']
-loss_val = []
-for ii in tqdm(range(epochs)):    
-    for xx, yy in train_loader:
-        xx, yy = xx.to(device), yy.to(device)
-        optimizer.zero_grad()
-        y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
-        loss = loss_func(y_out, yy)
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
-    run.log_metrics({'Train Loss': loss.item()})
-
-run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
-
-
-# %%
-fig = plt.figure(figsize=(10, 5))
-
-mini = torch.min(yy[-1,0][1:-1, 1:-1])
-maxi = torch.max(yy[-1,0][1:-1, 1:-1])
-
-
-# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
-plt.title('Inverse FD stencil')
-
-
-# Selecting the axis-X making the bottom and top axes False. 
-plt.tick_params(axis='x', which='both', bottom=False, 
-                top=False, labelbottom=False) 
-  
-# Selecting the axis-Y making the right and left axes False 
-plt.tick_params(axis='y', which='both', right=False, 
-                left=False, labelleft=False) 
-  # Remove frame
-plt.gca().spines['top'].set_visible(False)
-plt.gca().spines['right'].set_visible(False)
-plt.gca().spines['bottom'].set_visible(False)
-plt.gca().spines['left'].set_visible(False)
-
-
-ax = fig.add_subplot(1,2,1)
-pcm =ax.imshow(yy[-1,0][1:-1, 1:-1].detach().cpu().numpy(), cmap=cm.coolwarm, vmin=mini, vmax=maxi)
-ax.title.set_text('Actual Field')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
-
-ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
-ax.title.set_text('Retrieved Field')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
-
-#Saving the Image 
-
-#Saving the images
-plt.savefig('inverse_laplace.png')
-run.save(os.getcwd() + '/inverse_laplace.png', 'output')
-# run.save(plt.gcf(), 'output', name='FD_Stencils')
-
-#Saving the Code
-run.save(os.path.abspath(__file__), 'code')
-
-#Closing the simvue run. 
-run.close()
-# %%
