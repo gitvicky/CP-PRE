@@ -3,7 +3,7 @@
 """
 28th Feb, 2023
 
-Learning the required Convolutional Kernels 
+Learning the required Convolutional Kernels using LBFGS 
     1. Try and learn the finite difference stencil for performing the residual estimation
     2. If we are able to retrieve the FD stencils, attempt tp learnt the TranspConv kernel that maps from the residual to the field. 
 
@@ -22,7 +22,8 @@ import torch.nn.functional as F
 from pyDOE import lhs
 from tqdm import tqdm 
 
-seed = np.random.randint(1000)
+# seed = np.random.randint(1000)
+seed = 42
 torch.manual_seed(seed)
 np.random.seed(seed)
 
@@ -40,7 +41,6 @@ def generate_IC(N):
 
     lb = np.asarray([-10, 0.10, 0.10]) #Amp, x-pos, y-pos 
     ub = np.asarray([-50, 0.70, 0.70]) #Amp, x-pos, y-pos
-    
     
     params = lb + (ub-lb)*lhs(3, N)
     amp, x_pos, y_pos = params[:, 0], params[:, 1], params[:, 2]
@@ -88,22 +88,26 @@ class conv_laplace(nn.Module):
 from simvue import Run
 
 configuration = {"Case": 'Forward',
-                 "Epochs": 1000,
+                 "Epochs": 10,
                  "Batch Size": 1000,
-                 "Optimizer": 'Adam',
-                 "Learning Rate": 1e-3,
-                 "Scheduler Step": 100,
-                 "Scheduler Gamma": 0.5,
+                 "Optimizer": 'LBFGS',
+                #  "Optimizer": 'Adam',
+                #  "Learning Rate": 1e-3,
+                #  "Scheduler Step": 100,
+                #  "Scheduler Gamma": 0.5,
 }
 
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', 'Adam', 'FD'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
 learnt_laplace = conv_laplace().to(device)
 
 loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+if configuration['Optimizer'] == 'LBFGS':
+    optimizer = torch.optim.LBFGS(learnt_laplace.parameters(), history_size=10, max_iter=4)
+elif configuration['Optimizer'] == 'Adam':
+    optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
 # %% 
 #Prepping the data. 
 X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
@@ -112,19 +116,36 @@ Y_train = uu_laplace
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
 # %% 
+#Defining the Closure required to evaluaet LBFGS
+def closure():
+    optimizer.zero_grad()
+    y_out = learnt_laplace(xx)
+    loss = loss_func(y_out, yy)
+    loss.backward()
+    return loss
+
 #Training the Convolutional Network 
 epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
         xx, yy = xx.to(device), yy.to(device)
-        optimizer.zero_grad()
-        y_out = learnt_laplace(xx)
-        loss = loss_func(y_out, yy)
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
+
+        if configuration['Optimizer'] == 'LBFGS':
+            loss = closure()        
+            optimizer.step(closure)
+
+        elif configuration['Optimizer'] == 'Adam':
+            optimizer.zero_grad()
+            y_out = learnt_laplace(xx)
+            loss = loss_func(y_out, yy)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
+
+#Getting an output to plot 
+y_out = learnt_laplace(xx)
 
 run.save(learnt_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
 
@@ -186,7 +207,6 @@ run.save(os.path.abspath(__file__), 'code')
 run.close()
 
 # %%
-# %% 
 #Learning the inverse of the laplace 
 
 # 1D tranposed convolution for the inverse laplace
@@ -205,19 +225,25 @@ class transp_conv_inv_laplace(nn.Module):
 inv_laplace = transp_conv_inv_laplace().to(device)
 
 configuration = {"Case": 'Inverse',
-                 "Epochs": 5000,
+                 "Epochs": 10,
                  "Batch Size": 1000,
-                 "Optimizer": 'Adam',
-                 "Learning Rate": 5e-3,
-                 "Scheduler Step": 1000,
-                 "Scheduler Gamma": 0.5,
+                 "Optimizer": 'LBFGS',
+                #  "Optimizer": 'Adam',
+                #  "Learning Rate": 5e-3,
+                #  "Scheduler Step": 1000,
+                #  "Scheduler Gamma": 0.5,
 }
 run = Run()
 run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Adam', 'FD'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+
+if configuration['Optimizer'] == 'LBFGS':
+    optimizer = torch.optim.LBFGS(inv_laplace.parameters(), history_size=10, max_iter=4)
+elif configuration['Optimizer'] == 'Adam':
+    optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+
 # %% 
 #Prepping the data. 
 X_train = uu_laplace
@@ -226,22 +252,38 @@ Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
 # %% 
+
+#Defining the Closure required to evaluaet LBFGS
+def closure():
+    optimizer.zero_grad()
+    y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
+    loss = loss_func(y_out, yy)
+    loss.backward()
+    return loss
+
 #Training the Transposed Convolutional Network 
 epochs = configuration['Epochs']
 loss_val = []
 for ii in tqdm(range(epochs)):    
     for xx, yy in train_loader:
         xx, yy = xx.to(device), yy.to(device)
-        optimizer.zero_grad()
-        y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
-        loss = loss_func(y_out, yy)
-        loss.backward()
-        optimizer.step()
-        scheduler.step()
+        if configuration['Optimizer'] == 'LBFGS':
+            loss = closure()        
+            optimizer.step(closure)
+        
+        elif configuration['Optimizer'] == 'Adam':
+            optimizer.zero_grad()
+            y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
+            loss = loss_func(y_out, yy)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
     run.log_metrics({'Train Loss': loss.item()})
 
-run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
+#Getting an output to plot 
+y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
 
+run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
 
 # %%
 fig = plt.figure(figsize=(10, 5))
