@@ -234,7 +234,7 @@ configuration = {"Case": 'Inverse',
                 #  "Scheduler Gamma": 0.5,
 }
 run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', 'Adam', 'FD'], metadata=configuration)
+run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss()
 
