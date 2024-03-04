@@ -101,13 +101,13 @@ configuration = {"Case": 'Forward',
 run = Run()
 run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
-learnt_laplace = conv_laplace().to(device)
+fwd_laplace = conv_laplace().to(device)
 
 loss_func = torch.nn.MSELoss()
 if configuration['Optimizer'] == 'LBFGS':
-    optimizer = torch.optim.LBFGS(learnt_laplace.parameters(), history_size=10, max_iter=4)
+    optimizer = torch.optim.LBFGS(fwd_laplace.parameters(), history_size=10, max_iter=4)
 elif configuration['Optimizer'] == 'Adam':
-    optimizer = torch.optim.Adam(learnt_laplace.parameters(), lr=configuration['Learning Rate'])
+    optimizer = torch.optim.Adam(fwd_laplace.parameters(), lr=configuration['Learning Rate'])
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
 # %% 
 #Prepping the data. 
@@ -120,7 +120,7 @@ train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_trai
 #Defining the Closure required to evaluate LBFGS
 def closure():
     optimizer.zero_grad()
-    y_out = learnt_laplace(xx)
+    y_out = fwd_laplace(xx)
     loss = loss_func(y_out, yy)
     loss.backward()
     return loss
@@ -138,7 +138,7 @@ for ii in tqdm(range(epochs)):
 
         elif configuration['Optimizer'] == 'Adam':
             optimizer.zero_grad()
-            y_out = learnt_laplace(xx)
+            y_out = fwd_laplace(xx)
             loss = loss_func(y_out, yy)
             loss.backward()
             optimizer.step()
@@ -146,9 +146,9 @@ for ii in tqdm(range(epochs)):
     run.log_metrics({'Train Loss': loss.item()})
 
 #Getting an output to plot 
-y_out = learnt_laplace(xx)
+y_out = fwd_laplace(xx)
 
-run.save(learnt_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
+run.save(fwd_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
 
 # %%
 #Plotting and comparing 
