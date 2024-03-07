@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-28th Feb, 2023
+28th Feb, 2024
 
 Exploring the transformations and mathematical formulations of a Convolution and its Trasnposed Operation. 
 Understanding further from this: https://d2l.ai/chapter_computer-vision/transposed-conv.html

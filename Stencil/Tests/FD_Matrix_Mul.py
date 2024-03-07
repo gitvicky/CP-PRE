@@ -1,0 +1,137 @@
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+7th March, 2024
+
+Finite Difference as Matrix Multiplication. 
+
+If the Stencil (K) can be written in its Matrix Form as W. 
+Field Matrix flattened out as the fwd_laplace = X 
+The residual (laplacian in this case) fwd_laplace_soln = Y = W X
+The inverse of the laplace inv_laplace = W^-1
+Retreiving the input from the laplace inv_laplace_soln = W^-1 Y = W^-1 W X
+"""
+# %% 
+
+import numpy as np
+
+def finite_difference_matrix_2d(nx, ny, stencil, stencil_center):
+    """
+    Constructs the finite difference matrix for a given 2D stencil and grid sizes.
+
+    Args:
+        nx (int): The number of grid points in the x-direction.
+        ny (int): The number of grid points in the y-direction.
+        stencil (np.ndarray): A 2D array representing the finite difference stencil.
+        stencil_center (tuple): The center of the stencil, given as (x_center, y_center).
+
+    Returns:
+        np.ndarray: The finite difference matrix.
+    """
+    kx, ky = stencil.shape  # Order of the stencil in x and y directions
+    n = nx * ny  # Total number of grid points
+    A = np.zeros((n, n))
+
+    x_center, y_center = stencil_center  # Center of the stencil
+
+    # Fill the matrix rows
+    for i in range(nx):
+        for j in range(ny):
+            row_idx = i * ny + j  # Linear index for the current grid point
+            for kx_idx in range(kx):
+                for ky_idx in range(ky):
+                    # Compute the neighbor indices
+                    ix = i + kx_idx - x_center
+                    jy = j + ky_idx - y_center
+
+                    # Skip out-of-bounds neighbors
+                    if ix < 0 or ix >= nx or jy < 0 or jy >= ny:
+                        continue
+
+                    col_idx = ix * ny + jy  # Linear index for the neighbor
+                    A[row_idx, col_idx] = stencil[kx_idx, ky_idx]
+
+    return A
+
+
+
+# %% 
+grid_size = 64
+x = np.linspace(-1, 1, grid_size) #gridsize
+y = x.copy()
+xx, yy = np.meshgrid(x, y)
+uu = X = np.exp(-20 *(xx**2 + yy**2)) #2D Gaussian Initial Condition. 
+
+
+stencil = np.array([[0, 1, 0],
+                    [1, -4, 1],
+                    [0, 1, 0]])  # 2D Laplacian stencil
+
+stencil_center = (1, 1)  # Center of the stencil
+nx, ny = grid_size, grid_size
+fwd_laplace = W = finite_difference_matrix_2d(nx, ny, stencil, stencil_center) #fwd_laplace
+inv_laplace = np.linalg.inv(W)
+
+# %%
+fwd_laplace_soln = Y = np.matmul(W, uu.reshape(-1)).reshape(nx, ny)
+inv_laplace_soln = X_ = np.matmul(inv_laplace, Y.reshape(-1)).reshape(nx, ny)
+# %%
+#Plotting the input, laplace, inverse 
+from matplotlib import pyplot as plt 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+fig = plt.figure(figsize=(10, 5))
+
+mini = np.min(X)
+maxi = np.max(X)
+
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
+ax = fig.add_subplot(1,3,1)
+pcm =ax.imshow(X, cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
+ax.title.set_text('Input')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(1,3,2)
+pcm =ax.imshow(fwd_laplace_soln, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax.title.set_text('Forward Laplace')
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(1,3,3)
+pcm =ax.imshow(inv_laplace_soln, cmap=cm.coolwarm, vmin=mini, vmax=maxi)
+ax.title.set_text('Inverse Laplace')
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+
+
+
+# %%
