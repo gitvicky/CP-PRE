@@ -43,6 +43,7 @@ kernel_transp = kernel.T
 conv = F.conv2d(uu.view(1,1,uu.shape[0], uu.shape[1]), kernel.view(1,1,3,3,)) #Performing the convolution on the solution
 inv_conv = F.conv_transpose2d(conv, kernel_inv.view(1,1,3,3,)) #Tranposed convolution on the previously convolved solution using kernel inverse
 transposed_conv = F.conv_transpose2d(conv, kernel_transp.view(1,1,3,3,)) #Tranposed convolution on the previously convolved solution using kernel tranpose
+transposed_conv = F.conv_transpose2d(conv, kernel.view(1,1,3,3)) #Tranposed convolution on the previously convolved solution using kernel tranpose
 
 # %%
 #Plotting the conv and inv_conv
@@ -73,7 +74,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,3,3)
-pcm =ax.imshow(transposed_conv[0,0, 2:-2, 2:-2], cmap=cm.coolwarm)
+pcm =ax.imshow(transposed_conv[0,0, :, :], cmap=cm.coolwarm)
 ax.title.set_text('Retrieved using transpose')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -95,7 +96,7 @@ kernel_transp = kernel.T
 #used for transposed convolution could retreieve the original. 
 
 conv = F.conv2d(uu.view(1,1,uu.shape[0], uu.shape[1]), kernel.view(1,1,3,3,))
-transposed_conv = F.conv_transpose2d(conv, kernel_transp.view(1,1,3,3,))
+transposed_conv = F.conv_transpose2d(conv, kernel.view(1,1,3,3,))
 
 # %%
 #Plotting the conv and inv_conv
@@ -116,7 +117,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
 ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(transposed_conv[0,0, 2:-2, 2:-2], cmap=cm.coolwarm)
+pcm =ax.imshow(transposed_conv[0,0], cmap=cm.coolwarm)
 ax.title.set_text('Retrieved using Transpose')
 ax.set_xlabel('x')
 ax.set_ylabel('y')

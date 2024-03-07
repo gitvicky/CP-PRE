@@ -21,7 +21,7 @@ import torch.nn.functional as F
 #Setting up a convolution 
 
 X = torch.arange(9.0).reshape(3, 3)
-K = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+K = torch.tensor([[0.4, 4.0], [3.0, 1.5]])
 Y = F.conv2d(X.view(1,1,3,3), K.view(1,1,2,2))
 
 
@@ -38,6 +38,7 @@ print(W)
 
 # %%
 #Obtaining the Convolution as a multiplication between the sparse weight matrix and the input
+Y == torch.matmul(W, X.reshape(-1)).reshape(2, 2)
 Y = torch.matmul(W, X.reshape(-1)).reshape(2, 2)
 
 # %% 
@@ -53,4 +54,6 @@ def trans_conv(X, K):
 Z_handwritten = trans_conv(Y, K)
 Z_torch = F.conv_transpose2d(Y.view(1,1,2,2), K.view(1,1,2,2))
 Z_matmmul = torch.matmul(W.T, Y.reshape(-1)).reshape(3, 3)
+
+Z_torch == Z_matmmul
 # %%
