@@ -232,3 +232,48 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 # %%
+Y = F.conv2d(X.view(1,1,X.shape[0],X.shape[1]), K.view(1,1,3,3))
+transp_inv_conv_torch = F.conv_transpose2d(Y.view(1, 1, Y.shape[2], Y.shape[3]), torch.linalg.pinv(K@K.T).view(1,1,3,3))[0,0]
+
+# %%
+fig = plt.figure(figsize=(10, 5))
+
+mini = torch.min(X)
+maxi = torch.max(X)
+
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
+ax = fig.add_subplot(1,2,1)
+pcm =ax.imshow(X, cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
+ax.title.set_text('Input')
+# ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(1,2,2)
+pcm =ax.imshow(transp_inv_conv_torch, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax.title.set_text('(K@K.T)^-1')
+# ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+# %%

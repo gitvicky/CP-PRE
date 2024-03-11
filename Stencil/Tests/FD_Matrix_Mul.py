@@ -134,33 +134,33 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 # %%
 #Cholesky
 
-from scipy.linalg import cholesky
-a = np.array([[1,-2],[2,5]])
-L = cholesky(a, lower=True)
-# print(L)
-print(L @ L.T)
+# A = np.array([[4, 1, 1],
+#               [1, 2, 3],
+#               [1, 3, 6]])
 
-# %%
-import numpy as np
+A = W
+def cholesky_inverse(A):
+    # Perform Cholesky decomposition
+    L = np.linalg.cholesky(A)
 
-A = np.array([[4, 1, 1],
-              [1, 2, 3],
-              [1, 3, 6]])
+    # Compute the inverse of L
+    L_inv = np.linalg.inv(L)
 
-# Perform Cholesky decomposition
-L = np.linalg.cholesky(A)
+    # # Compute the inverse of L^T
+    # L_T_inv = np.linalg.inv(L.T)
+    L_T_inv = L_inv.T
 
-# Compute the inverse of L
-L_inv = np.linalg.inv(L)
+    # Compute the inverse of A
+    A_inv = np.dot(L_T_inv, L_inv)
 
-# Compute the inverse of L^T
-L_T_inv = np.linalg.inv(L.T)
+    return A_inv
 
-# Compute the inverse of A
-A_inv = np.dot(L_T_inv, L_inv)
+%timeit A_inverse = np.linalg.inv(A)
+%timeit A_cholesky = cholesky_inverse(A)
 
-print("Original matrix A:")
-print(np.linalg.inv(A))
+
+print("Inverse of original matrix A:")
+print(A_inverse)
 print("\nInverse of A using Cholesky decomposition:")
-print(A_inv)
+print(A_cholesky)
 # %%
