@@ -132,13 +132,13 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 # %%
-#Cholesky
+#Cholesky Decomposition of the Stencil Matrix 
 
 # A = np.array([[4, 1, 1],
 #               [1, 2, 3],
 #               [1, 3, 6]])
 
-A = W
+A = W #weight matrix
 def cholesky_inverse(A):
     # Perform Cholesky decomposition
     L = np.linalg.cholesky(A)
@@ -155,12 +155,73 @@ def cholesky_inverse(A):
 
     return A_inv
 
-%timeit A_inverse = np.linalg.inv(A)
-%timeit A_cholesky = cholesky_inverse(A)
+# %timeit A_inverse = np.linalg.inv(A)
+# %timeit A_cholesky = cholesky_inverse(A)
 
-
-print("Inverse of original matrix A:")
-print(A_inverse)
-print("\nInverse of A using Cholesky decomposition:")
-print(A_cholesky)
+# print("Inverse of original matrix A:")
+# print(A_inverse)
+# print("\nInverse of A using Cholesky decomposition:")
+# print(A_cholesky)
 # %%
+#Comparing the FD Matrix and FD Conv
+
+# %%
+#Obtaining the Laplace using convolutions. 
+import torch 
+import torch.nn.functional as F
+
+def fwd_laplace_stencil(X):    
+    laplace_kernel = torch.tensor([[0., 1., 0.],
+                                   [1., -4., 1.],
+                                   [0, 1., 0.]])
+    
+    conv = F.conv2d(X, laplace_kernel.view(1,1,3,3),padding=(1,1))
+    return conv
+
+X_torch = torch.tensor(X, dtype=torch.float32)
+fwd_laplace_conv = fwd_laplace_stencil(X_torch.view(1, 1, X_torch.shape[0], X_torch.shape[1]))[0,0]
+# %%
+
+fig = plt.figure(figsize=(10, 5))
+
+# mini = torch.min(X)
+# maxi = torch.max(X)
+
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
+ax = fig.add_subplot(1,2,1)
+pcm =ax.imshow(fwd_laplace_soln, cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
+ax.title.set_text('Matrix Stencil')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(1,2,2)
+pcm =ax.imshow(fwd_laplace_conv, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax.title.set_text('Conv Stencil')
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+
+# %%
+#Comparing the Fourier based method. 

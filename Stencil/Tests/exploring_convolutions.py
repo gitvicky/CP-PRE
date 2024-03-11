@@ -276,4 +276,3 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-# %%
