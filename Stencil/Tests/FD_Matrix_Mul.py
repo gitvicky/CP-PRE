@@ -57,7 +57,7 @@ def finite_difference_matrix_2d(nx, ny, stencil, stencil_center):
 
 
 # %% 
-grid_size = 64
+grid_size = 128
 x = np.linspace(-1, 1, grid_size) #gridsize
 y = x.copy()
 xx, yy = np.meshgrid(x, y)
@@ -81,7 +81,7 @@ inv_laplace_soln = X_ = np.matmul(inv_laplace, Y.reshape(-1)).reshape(nx, ny)
 from matplotlib import pyplot as plt 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(20, 5))
 
 mini = np.min(X)
 maxi = np.max(X)
@@ -115,7 +115,7 @@ ax = fig.add_subplot(1,3,2)
 pcm =ax.imshow(fwd_laplace_soln, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
 ax.title.set_text('Forward Laplace')
 ax.set_xlabel('x')
-# ax.set_ylabel('y')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
@@ -125,13 +125,42 @@ ax = fig.add_subplot(1,3,3)
 pcm =ax.imshow(inv_laplace_soln, cmap=cm.coolwarm, vmin=mini, vmax=maxi)
 ax.title.set_text('Inverse Laplace')
 ax.set_xlabel('x')
-# ax.set_ylabel('y')
+ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
+# %%
+#Cholesky
 
+from scipy.linalg import cholesky
+a = np.array([[1,-2],[2,5]])
+L = cholesky(a, lower=True)
+# print(L)
+print(L @ L.T)
 
+# %%
+import numpy as np
 
+A = np.array([[4, 1, 1],
+              [1, 2, 3],
+              [1, 3, 6]])
+
+# Perform Cholesky decomposition
+L = np.linalg.cholesky(A)
+
+# Compute the inverse of L
+L_inv = np.linalg.inv(L)
+
+# Compute the inverse of L^T
+L_T_inv = np.linalg.inv(L.T)
+
+# Compute the inverse of A
+A_inv = np.dot(L_T_inv, L_inv)
+
+print("Original matrix A:")
+print(np.linalg.inv(A))
+print("\nInverse of A using Cholesky decomposition:")
+print(A_inv)
 # %%
