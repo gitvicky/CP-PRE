@@ -35,7 +35,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #This will be the training input
 def generate_IC(N):
 
-    x = np.linspace(1, -1, 31)
+    x = np.linspace(-1, 1, 128)
+    dx = x[1] -  x[0]
     y = x.copy()
     xx, yy = np.meshgrid(x, y)
 
@@ -49,21 +50,21 @@ def generate_IC(N):
     u_ic = []
     for ii in range(N):
         u_ic.append(np.exp(amp[ii]*((xx-x_pos[ii])**2 + (yy-y_pos[ii])**2)))
-    return np.asarray(u_ic)
+    return dx, np.asarray(u_ic)
 
 N_samples = 10000
-uu = generate_IC(N_samples)
+dx, uu = generate_IC(N_samples)
 uu = torch.Tensor(uu)
 
 # %% 
 #Obtaining the laplacian of the field evaluated using the 5-point stencil. 
 #This will be the training target
 def laplace_stencil(X):    
-    laplace_kernel = torch.tensor([[0., 1., 0.],
+    laplace_kernel = (1/dx**2) * torch.tensor([[0., 1., 0.],
                                    [1., -4., 1.],
                                    [0, 1., 0.]])
     
-    conv = F.conv2d(X, laplace_kernel.view(1,1,3,3))
+    conv = F.conv2d(X, laplace_kernel.view(1,1,3,3), padding=(1,1))
     return conv
 
 uu_laplace = laplace_stencil(uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2]))
@@ -77,7 +78,7 @@ class conv_laplace(nn.Module):
         super(conv_laplace, self).__init__()
 
         #Convolutional Layers
-        self.conv = nn.Conv2d(1, 1, (3,3), stride=1)
+        self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
 
     def forward(self, x):
         x = self.conv(x)
@@ -86,7 +87,7 @@ class conv_laplace(nn.Module):
 
 # %% 
 #Setting up simvue 
-from simvue import Run
+# from simvue import Run
 
 configuration = {"Case": 'Forward',
                  "Epochs": 10,
@@ -98,14 +99,14 @@ configuration = {"Case": 'Forward',
                 #  "Scheduler Gamma": 0.5,
 }
 
-run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
+# run = Run(mode='disabled')
+# run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forward Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
 fwd_laplace = conv_laplace().to(device)
 
 loss_func = torch.nn.MSELoss()
 if configuration['Optimizer'] == 'LBFGS':
-    optimizer = torch.optim.LBFGS(fwd_laplace.parameters(), history_size=10, max_iter=4)
+    optimizer = torch.optim.LBFGS(fwd_laplace.parameters(), lr=1, max_iter=20, max_eval=None, tolerance_grad=1e-07, tolerance_change=1e-09, history_size=100, line_search_fn=None)
 elif configuration['Optimizer'] == 'Adam':
     optimizer = torch.optim.Adam(fwd_laplace.parameters(), lr=configuration['Learning Rate'])
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
@@ -143,12 +144,13 @@ for ii in tqdm(range(epochs)):
             loss.backward()
             optimizer.step()
             scheduler.step()
-    run.log_metrics({'Train Loss': loss.item()})
+    print(loss.item())
+    # run.log_metrics({'Train Loss': loss.item()})
 
 #Getting an output to plot 
 y_out = fwd_laplace(xx)
 
-run.save(fwd_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
+# run.save(fwd_laplace.conv.weight.detach().cpu().numpy(), 'output', name='learnt_forward_stencil.npy')
 
 # %%
 #Plotting and comparing 
@@ -198,14 +200,14 @@ cbar.formatter.set_powerlimits((0, 0))
 
 #Saving the images
 plt.savefig('laplace.png')
-run.save(os.getcwd() + '/laplace.png', 'output')
-# run.save(plt.gcf(), 'output', name='FD_Stencils')
+# run.save(os.getcwd() + '/laplace.png', 'output')
+## run.save(plt.gcf(), 'output', name='FD_Stencils')
 
 #Saving the Code
-run.save(os.path.abspath(__file__), 'code')
+# run.save(os.path.abspath(__file__), 'code')
 
 #Closing the run. 
-run.close()
+# run.close()
 
 # %%
 #Learning the inverse of the laplace 
@@ -216,17 +218,19 @@ class transp_conv_inv_laplace(nn.Module):
         super(transp_conv_inv_laplace, self).__init__()
 
         #Convolutional Layers
-        self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
+        # self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
+        self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
 
     def forward(self, x):
-        x =self.transp_conv(x)
+        # x =self.transp_conv(x)
+        x = self.conv(x)
         return x
     
 
 inv_laplace = transp_conv_inv_laplace().to(device)
 
 configuration = {"Case": 'Inverse',
-                 "Epochs": 50,
+                 "Epochs": 10,
                  "Batch Size": 10000,
                  "Optimizer": 'LBFGS',
                 #  "Optimizer": 'Adam',
@@ -234,8 +238,8 @@ configuration = {"Case": 'Inverse',
                 #  "Scheduler Step": 1000,
                 #  "Scheduler Gamma": 0.5,
 }
-run = Run()
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
+# run = Run()
+# run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss()
 
@@ -248,7 +252,7 @@ elif configuration['Optimizer'] == 'Adam':
 # %% 
 #Prepping the data. 
 X_train = uu_laplace
-Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])[:,:,1:-1,1:-1]
+Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
 
@@ -257,7 +261,7 @@ train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_trai
 #Defining the Closure required to evaluate LBFGS
 def closure():
     optimizer.zero_grad()
-    y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
+    y_out = inv_laplace(xx)
     loss = loss_func(y_out, yy)
     loss.backward()
     return loss
@@ -274,23 +278,24 @@ for ii in tqdm(range(epochs)):
         
         elif configuration['Optimizer'] == 'Adam':
             optimizer.zero_grad()
-            y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
+            y_out = inv_laplace(xx)
             loss = loss_func(y_out, yy)
             loss.backward()
             optimizer.step()
             scheduler.step()
-    run.log_metrics({'Train Loss': loss.item()})
+    # run.log_metrics({'Train Loss': loss.item()})
+        print(loss.item())
 
 #Getting an output to plot 
-y_out = inv_laplace(xx)[:, :, 1:-1, 1:-1]
+y_out = inv_laplace(xx)
 
-run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
+# run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
 
 # %%
 fig = plt.figure(figsize=(10, 5))
 
-mini = torch.min(yy[-1,0][1:-1, 1:-1])
-maxi = torch.max(yy[-1,0][1:-1, 1:-1])
+mini = torch.min(yy[-1,0])
+maxi = torch.max(yy[-1,0])
 
 
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
@@ -335,14 +340,14 @@ cbar.formatter.set_powerlimits((0, 0))
 
 #Saving the images
 plt.savefig('inverse_laplace.png')
-run.save(os.getcwd() + '/inverse_laplace.png', 'output')
-# run.save(plt.gcf(), 'output', name='FD_Stencils')
+# run.save(os.getcwd() + '/inverse_laplace.png', 'output')
+## run.save(plt.gcf(), 'output', name='FD_Stencils')
 
 #Saving the Code
-run.save(os.path.abspath(__file__), 'code')
+# run.save(os.path.abspath(__file__), 'code')
 
 #Closing the simvue run. 
-run.close()                                                                                                                                                                        
+# run.close()                                                                                                                                                                        
 # %%
 
 ################################################
@@ -374,8 +379,8 @@ configuration = {"Case": 'Forward-Inverse',
                 #  "Scheduler Step": 1000,
                 #  "Scheduler Gamma": 0.5,
 }
-run = Run(mode='online')
-run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forwardd and Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
+# run = Run(mode='disabled')
+# run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forwardd and Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
 loss_func = torch.nn.MSELoss()
 
@@ -416,7 +421,7 @@ for ii in tqdm(range(epochs)):
             loss.backward()
             optimizer.step()
             scheduler.step()
-    run.log_metrics({'Train Loss': loss.item()})
+    # run.log_metrics({'Train Loss': loss.item()})
 
 #Getting an output to plot 
 y_out = laplace_autoencoder(xx)
@@ -482,12 +487,12 @@ cbar.formatter.set_powerlimits((0, 0))
 
 #Saving the images
 plt.savefig('forward-inverse_laplace.png')
-run.save(os.getcwd() + '/forward-inverse_laplace.png', 'output')
-# run.save(plt.gcf(), 'output', name='FD_Stencils')
+# run.save(os.getcwd() + '/forward-inverse_laplace.png', 'output')
+##run.save(plt.gcf(), 'output', name='FD_Stencils')
 
 #Saving the Code
-run.save(os.path.abspath(__file__), 'code')
+# run.save(os.path.abspath(__file__), 'code')
 
 #Closing the simvue run. 
-run.close()                                
+# run.close()                                
 # %%
