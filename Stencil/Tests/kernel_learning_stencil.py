@@ -223,7 +223,7 @@ class transp_conv_inv_laplace(nn.Module):
 
     def forward(self, x):
         # x =self.transp_conv(x)
-        x = self.conv(x)
+        x = self.conv(x) *dx**2
         return x
     
 
@@ -244,7 +244,7 @@ configuration = {"Case": 'Inverse',
 loss_func = torch.nn.MSELoss()
 
 if configuration['Optimizer'] == 'LBFGS':
-    optimizer = torch.optim.LBFGS(inv_laplace.parameters(), history_size=10, max_iter=4)
+    optimizer = torch.optim.LBFGS(inv_laplace.parameters(), lr=1, max_iter=20, max_eval=None, tolerance_grad=1e-07, tolerance_change=1e-09, history_size=100, line_search_fn=None)
 elif configuration['Optimizer'] == 'Adam':
     optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])

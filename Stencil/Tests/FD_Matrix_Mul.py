@@ -59,6 +59,7 @@ def finite_difference_matrix_2d(nx, ny, stencil, stencil_center):
 # %% 
 grid_size = 128
 x = np.linspace(-1, 1, grid_size) #gridsize
+dx = x[1]-x[0]
 y = x.copy()
 xx, yy = np.meshgrid(x, y)
 uu = X = np.exp(-20 *(xx**2 + yy**2)) #2D Gaussian Initial Condition. 
@@ -66,12 +67,19 @@ uu = X = np.exp(-20 *(xx**2 + yy**2)) #2D Gaussian Initial Condition.
 
 stencil = np.array([[0, 1, 0],
                     [1, -4, 1],
-                    [0, 1, 0]])  # 2D Laplacian stencil
+                    [0, 1, 0]])  # 2D Laplacian stencil-
 
 stencil_center = (1, 1)  # Center of the stencil
 nx, ny = grid_size, grid_size
+import tracemalloc
+tracemalloc.start()
+
 fwd_laplace = W = finite_difference_matrix_2d(nx, ny, stencil, stencil_center) #fwd_laplace
 inv_laplace = np.linalg.inv(W)
+
+# %%
+#Inverting a block diagonal matrix -- look into the scipy sparse matrix library
+#https://docs.scipy.org/doc/scipy/reference/sparse.html
 
 # %%
 fwd_laplace_soln = Y = np.matmul(W, uu.reshape(-1)).reshape(nx, ny)
@@ -180,9 +188,48 @@ def fwd_laplace_stencil(X):
 
 X_torch = torch.tensor(X, dtype=torch.float32)
 fwd_laplace_conv = fwd_laplace_stencil(X_torch.view(1, 1, X_torch.shape[0], X_torch.shape[1]))[0,0]
+
+
+# %%
+#Comparing the Fourier based method. 
+import numpy as np
+from scipy.fft import fft2, ifft2
+
+def laplace_operator_fft(field):
+    """
+    Computes the Laplace operator of a 2D field using Fast Fourier Transforms (FFT).
+    
+    Args:
+        field (numpy.ndarray): A 2D array representing the field.
+        
+    Returns:
+        numpy.ndarray: The Laplace operator of the input field.
+    """
+    # Compute the FFT of the input field
+    fft_field = fft2(field)
+    
+    # Get the dimensions of the field
+    m, n = field.shape
+    
+    # Create the frequency domain mesh
+    col_mesh, row_mesh = np.meshgrid(np.fft.fftfreq(n, 2/n), np.fft.fftfreq(m, 2/m))
+    
+    # Compute the Laplacian operator in the frequency domain
+    laplacian_kernel = -1 * (2 * np.pi) ** 2 * (col_mesh ** 2 + row_mesh ** 2)
+    
+    # Apply the Laplacian kernel to the FFT of the field
+    fft_laplacian = fft_field * laplacian_kernel
+    
+    # Compute the inverse FFT to get the Laplacian in the spatial domain
+    laplacian =  np.real(ifft2(fft_laplacian))
+    
+    return laplacian
+
+fwd_laplace_fourier = laplace_operator_fft(X)
+
 # %%
 
-fig = plt.figure(figsize=(10, 5))
+fig = plt.figure(figsize=(18, 5))
 
 # mini = torch.min(X)
 # maxi = torch.max(X)
@@ -202,7 +249,7 @@ plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
 
-ax = fig.add_subplot(1,2,1)
+ax = fig.add_subplot(1,3,1)
 pcm =ax.imshow(fwd_laplace_soln, cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
 ax.title.set_text('Matrix Stencil')
 ax.set_xlabel('x')
@@ -212,7 +259,7 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(1,2,2)
+ax = fig.add_subplot(1,3,2)
 pcm =ax.imshow(fwd_laplace_conv, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
 ax.title.set_text('Conv Stencil')
 ax.set_xlabel('x')
@@ -222,6 +269,14 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
+ax = fig.add_subplot(1,3,3)
+pcm =ax.imshow(fwd_laplace_fourier, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax.title.set_text('FFT')
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 # %%
-#Comparing the Fourier based method. 
