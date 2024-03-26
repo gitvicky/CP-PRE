@@ -15,7 +15,7 @@ Retreiving the input from the laplace inv_laplace_soln = W^-1 Y = W^-1 W X
 # %% 
 
 import numpy as np
-
+import scipy
 def finite_difference_matrix_2d(nx, ny, stencil, stencil_center):
     """
     Constructs the finite difference matrix for a given 2D stencil and grid sizes.
@@ -77,13 +77,17 @@ tracemalloc.start()
 fwd_laplace = W = finite_difference_matrix_2d(nx, ny, stencil, stencil_center) #fwd_laplace
 inv_laplace = np.linalg.inv(W)
 
-# %%
-#Inverting a block diagonal matrix -- look into the scipy sparse matrix library
-#https://docs.scipy.org/doc/scipy/reference/sparse.html
 
 # %%
 fwd_laplace_soln = Y = np.matmul(W, uu.reshape(-1)).reshape(nx, ny)
 inv_laplace_soln = X_ = np.matmul(inv_laplace, Y.reshape(-1)).reshape(nx, ny)
+
+# %%
+#Inverting a block diagonal matrix -- look into the scipy sparse matrix library
+#https://docs.scipy.org/doc/scipy/reference/sparse.html
+
+%timeit conj_grad = scipy.sparse.linalg.cg(W, Y.flatten())[0]
+conj_grad = np.reshape(conj_grad, (grid_size, grid_size))
 # %%
 #Plotting the input, laplace, inverse 
 from matplotlib import pyplot as plt 
@@ -109,7 +113,7 @@ plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
 
-ax = fig.add_subplot(1,3,1)
+ax = fig.add_subplot(1,4,1)
 pcm =ax.imshow(X, cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
 ax.title.set_text('Input')
 ax.set_xlabel('x')
@@ -119,7 +123,7 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(1,3,2)
+ax = fig.add_subplot(1,4,2)
 pcm =ax.imshow(fwd_laplace_soln, cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
 ax.title.set_text('Forward Laplace')
 ax.set_xlabel('x')
@@ -129,9 +133,20 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(1,3,3)
+ax = fig.add_subplot(1,4,3)
 pcm =ax.imshow(inv_laplace_soln, cmap=cm.coolwarm, vmin=mini, vmax=maxi)
 ax.title.set_text('Inverse Laplace')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+
+ax = fig.add_subplot(1,4,4)
+pcm =ax.imshow(conj_grad, cmap=cm.coolwarm, vmin=mini, vmax=maxi)
+ax.title.set_text('Conj. Grad.')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)

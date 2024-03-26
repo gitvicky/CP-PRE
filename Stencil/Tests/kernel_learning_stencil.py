@@ -10,7 +10,7 @@ Learning the required Convolutional Kernels using LBFGS
 Using the wave equation as the base test case for this experiment.
 """
 
-# %% 
+# %% x
 import os
 import numpy as np 
 import matplotlib.pyplot as plt 
@@ -60,7 +60,7 @@ uu = torch.Tensor(uu)
 #Obtaining the laplacian of the field evaluated using the 5-point stencil. 
 #This will be the training target
 def laplace_stencil(X):    
-    laplace_kernel = (1/dx**2) * torch.tensor([[0., 1., 0.],
+    laplace_kernel = (1/dx**2)*torch.tensor([[0., 1., 0.],
                                    [1., -4., 1.],
                                    [0, 1., 0.]])
     
@@ -219,11 +219,12 @@ class transp_conv_inv_laplace(nn.Module):
 
         #Convolutional Layers
         # self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
-        self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
+        # self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
+        self.conv = nn.Conv2d(1, 1, (17,17), stride=1, padding=(8,8))
 
     def forward(self, x):
         # x =self.transp_conv(x)
-        x = self.conv(x) *dx**2
+        x = self.conv(x)*dx**2
         return x
     
 
@@ -297,7 +298,6 @@ fig = plt.figure(figsize=(10, 5))
 mini = torch.min(yy[-1,0])
 maxi = torch.max(yy[-1,0])
 
-
 # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
 plt.title('Inverse FD stencil')
 
@@ -350,149 +350,150 @@ plt.savefig('inverse_laplace.png')
 # run.close()                                                                                                                                                                        
 # %%
 
-################################################
-#Learning the forward and inverse together using an Autoencoder 
+# ################################################
+# #Learning the forward and inverse together using an Autoencoder 
 
-# 1D tranposed convolution for the inverse laplace
-class autoencoder(nn.Module):
-    def __init__(self, activation=None):
-        super(autoencoder, self).__init__()
+# # 1D tranposed convolution for the inverse laplace
+# class autoencoder(nn.Module):
+#     def __init__(self, activation=None):
+#         super(autoencoder, self).__init__()
 
-        #Convolutional Layers
-        # self.conv = nn.Conv2d(1, 1, (3,3), stride=1)
-        self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
+#         #Convolutional Layers
+#         # self.conv = nn.Conv2d(1, 1, (3,3), stride=1)
+#         self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
 
-    def forward(self, x):
-        # x = self.transp_conv(self.conv(x))
-        x = self.transp_conv(laplace_stencil(x))
-        return x
+#     def forward(self, x):
+#         # x = self.transp_conv(self.conv(x))
+#         x = self.transp_conv(laplace_stencil(x))
+#         return x
     
 
-laplace_autoencoder = autoencoder().to(device)
+# laplace_autoencoder = autoencoder().to(device)
 
-configuration = {"Case": 'Forward-Inverse',
-                 "Epochs": 50,
-                 "Batch Size": 10000,
-                 "Optimizer": 'LBFGS',
-                #  "Optimizer": 'Adam',
-                #  "Learning Rate": 5e-3,
-                #  "Scheduler Step": 1000,
-                #  "Scheduler Gamma": 0.5,
-}
-# run = Run(mode='disabled')
-# run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forwardd and Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
+# configuration = {"Case": 'Forward-Inverse',
+#                  "Epochs": 50,
+#                  "Batch Size": 10000,
+#                  "Optimizer": 'LBFGS',
+#                 #  "Optimizer": 'Adam',
+#                 #  "Learning Rate": 5e-3,
+#                 #  "Scheduler Step": 1000,
+#                 #  "Scheduler Gamma": 0.5,
+# }
+# # run = Run(mode='disabled')
+# # run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Forwardd and Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
 
-loss_func = torch.nn.MSELoss()
+# loss_func = torch.nn.MSELoss()
 
-if configuration['Optimizer'] == 'LBFGS':
-    optimizer = torch.optim.LBFGS(laplace_autoencoder.parameters(), history_size=10, max_iter=4)
-elif configuration['Optimizer'] == 'Adam':
-    optimizer = torch.optim.Adam(laplace_autoencoder.parameters(), lr=configuration['Learning Rate'])
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+# if configuration['Optimizer'] == 'LBFGS':
+#     optimizer = torch.optim.LBFGS(laplace_autoencoder.parameters(), history_size=10, max_iter=4)
+# elif configuration['Optimizer'] == 'Adam':
+#     optimizer = torch.optim.Adam(laplace_autoencoder.parameters(), lr=configuration['Learning Rate'])
+#     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
 
-# %% 
-#Prepping the data. 
-X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
-train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, X_train), batch_size=configuration['Batch Size'], shuffle=True)
+# # %% 
+# #Prepping the data. 
+# X_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
+# train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, X_train), batch_size=configuration['Batch Size'], shuffle=True)
 
-# %% 
-#Defining the Closure required to evaluate LBFGS
-def closure():
-    optimizer.zero_grad()
-    y_out = laplace_autoencoder(xx)
-    loss = loss_func(y_out, yy)
-    loss.backward()
-    return loss
+# # %% 
+# #Defining the Closure required to evaluate LBFGS
+# def closure():
+#     optimizer.zero_grad()
+#     y_out = laplace_autoencoder(xx)
+#     loss = loss_func(y_out, yy)
+#     loss.backward()
+#     return loss
 
-#Training the Transposed Convolutional Network 
-epochs = configuration['Epochs']
-loss_val = []
-for ii in tqdm(range(epochs)):    
-    for xx, yy in train_loader:
-        xx, yy = xx.to(device), yy.to(device)
-        if configuration['Optimizer'] == 'LBFGS':
-            loss = closure()        
-            optimizer.step(closure)
+# #Training the Transposed Convolutional Network 
+# epochs = configuration['Epochs']
+# loss_val = []
+# for ii in tqdm(range(epochs)):    
+#     for xx, yy in train_loader:
+#         xx, yy = xx.to(device), yy.to(device)
+#         if configuration['Optimizer'] == 'LBFGS':
+#             loss = closure()        
+#             optimizer.step(closure)
         
-        elif configuration['Optimizer'] == 'Adam':
-            optimizer.zero_grad()
-            y_out = laplace_autoencoder(xx)
-            loss = loss_func(y_out, yy)
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-    # run.log_metrics({'Train Loss': loss.item()})
+#         elif configuration['Optimizer'] == 'Adam':
+#             optimizer.zero_grad()
+#             y_out = laplace_autoencoder(xx)
+#             loss = loss_func(y_out, yy)
+#             loss.backward()
+#             optimizer.step()
+#             scheduler.step()
+#     # run.log_metrics({'Train Loss': loss.item()})
 
-#Getting an output to plot 
-y_out = laplace_autoencoder(xx)
+# #Getting an output to plot 
+# y_out = laplace_autoencoder(xx)
 
-# %% 
-try: 
-    print("Forward Kernel")
-    print(laplace_autoencoder.conv.weight)
-except: 
-    pass
-print()
-print("Inverse Kernel")
-print(laplace_autoencoder.transp_conv.weight)
+# # %% 
+# try: 
+#     print("Forward Kernel")
+#     print(laplace_autoencoder.conv.weight)
+# except: 
+#     pass
+# print()
+# print("Inverse Kernel")
+# print(laplace_autoencoder.transp_conv.weight)
 
-# run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
+# # run.save(inv_laplace.transp_conv.weight.detach().cpu().numpy(), 'output', name='learnt_inverse_stencil.npy')
 
-# %%
-fig = plt.figure(figsize=(10, 5))
+# # %%
+# fig = plt.figure(figsize=(10, 5))
 
-mini = torch.min(yy[-1,0])
-maxi = torch.max(yy[-1,0])
-
-
-# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
-plt.title('Autoencoder FD stencil')
+# mini = torch.min(yy[-1,0])
+# maxi = torch.max(yy[-1,0])
 
 
-# Selecting the axis-X making the bottom and top axes False. 
-plt.tick_params(axis='x', which='both', bottom=False, 
-                top=False, labelbottom=False) 
+# # plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+# plt.title('Autoencoder FD stencil')
+
+
+# # Selecting the axis-X making the bottom and top axes False. 
+# plt.tick_params(axis='x', which='both', bottom=False, 
+#                 top=False, labelbottom=False) 
   
-# Selecting the axis-Y making the right and left axes False 
-plt.tick_params(axis='y', which='both', right=False, 
-                left=False, labelleft=False) 
-  # Remove frame
-plt.gca().spines['top'].set_visible(False)
-plt.gca().spines['right'].set_visible(False)
-plt.gca().spines['bottom'].set_visible(False)
-plt.gca().spines['left'].set_visible(False)
+# # Selecting the axis-Y making the right and left axes False 
+# plt.tick_params(axis='y', which='both', right=False, 
+#                 left=False, labelleft=False) 
+#   # Remove frame
+# plt.gca().spines['top'].set_visible(False)
+# plt.gca().spines['right'].set_visible(False)
+# plt.gca().spines['bottom'].set_visible(False)
+# plt.gca().spines['left'].set_visible(False)
 
 
-ax = fig.add_subplot(1,2,1)
-pcm =ax.imshow(yy[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm, vmin=mini, vmax=maxi)
-ax.title.set_text('Actual Field')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# ax = fig.add_subplot(1,2,1)
+# pcm =ax.imshow(yy[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm, vmin=mini, vmax=maxi)
+# ax.title.set_text('Actual Field')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
-ax = fig.add_subplot(1,2,2)
-pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
-ax.title.set_text('Retrieved Field')
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+# ax = fig.add_subplot(1,2,2)
+# pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
+# ax.title.set_text('Retrieved Field')
+# ax.set_xlabel('x')
+# ax.set_ylabel('y')
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = fig.colorbar(pcm, cax=cax)
+# cbar.formatter.set_powerlimits((0, 0))
 
-#Saving the Image 
+# #Saving the Image 
 
-#Saving the images
-plt.savefig('forward-inverse_laplace.png')
-# run.save(os.getcwd() + '/forward-inverse_laplace.png', 'output')
-##run.save(plt.gcf(), 'output', name='FD_Stencils')
+# #Saving the images
+# plt.savefig('forward-inverse_laplace.png')
+# # run.save(os.getcwd() + '/forward-inverse_laplace.png', 'output')
+# ##run.save(plt.gcf(), 'output', name='FD_Stencils')
 
-#Saving the Code
-# run.save(os.path.abspath(__file__), 'code')
+# #Saving the Code
+# # run.save(os.path.abspath(__file__), 'code')
 
-#Closing the simvue run. 
-# run.close()                                
-# %%
+# #Closing the simvue run. 
+# # run.close()                                
+# # %%
+

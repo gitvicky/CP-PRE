@@ -194,7 +194,6 @@ u_tensor =torch.tensor(u_val, dtype=torch.float32).reshape(u_val.shape[0], 1, u_
 alpha = 1/(dt**2)
 beta = 1/(12*dx**2)
 
-
 #Standard
 
 three_point_stencil  = torch.tensor([[0, 1, 0],
@@ -225,7 +224,8 @@ stencil_time = stencil_time.view(1, 1, 3, 3, 3)
 stencil_xx = stencil_xx.view(1, 1, 3, 3, 3)
 stencil_yy =  stencil_yy.view(1, 1, 3, 3, 3)
 
-deriv_stencil_conv = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stencil_xx)[0,0] - F.conv3d(u_tensor, stencil_yy)[0,0]
+# deriv_stencil_conv = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stencil_xx)[0,0] - F.conv3d(u_tensor, stencil_yy)[0,0]
+deriv_stencil_conv = F.conv3d(u_tensor, stencil_time, padding=0)[0,0] - F.conv3d(u_tensor, stencil_xx, padding=0)[0,0] - F.conv3d(u_tensor, stencil_yy, padding=0)[0,0]
 
 deriv_stencil_conv = deriv_stencil_conv.permute(1,2,0)
 # %% 
@@ -233,7 +233,7 @@ deriv_stencil_conv = deriv_stencil_conv.permute(1,2,0)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 idx = 0
-t_idx = -1
+t_idx = -5
 
 u_actual = pred_u[idx][...,1:-1, 1:-1, 1:-1].numpy()
 u_pred = pred_set[idx][...,1:-1, 1:-1, 1:-1].numpy()
@@ -286,4 +286,9 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 cbar.formatter.set_powerlimits((0, 0))
 
+# %%
+#Exploring the calibration method. 
+y = u_actual[...,t_idx]
+y_tilde = u_pred[...,t_idx]
+y_tilde_residual = deriv_stencil_conv[...,t_idx]
 # %%

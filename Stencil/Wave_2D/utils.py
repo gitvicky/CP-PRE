@@ -526,11 +526,11 @@ class FNO_multi(nn.Module):
         self.fc0_time = nn.Linear(T_in + 2, self.width_time)
 
         self.f0 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
-        self.f1 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
-        self.f2 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
-        self.f3 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
-        self.f4 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
-        self.f5 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
+        # self.f1 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
+        # self.f2 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
+        # self.f3 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
+        # self.f4 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
+        # self.f5 = FNO2d(self.modes1, self.modes2, self.width_time, self.num_vars)
 
 
         self.fc1_time = nn.Linear(self.width_time, 256)
@@ -553,20 +553,20 @@ class FNO_multi(nn.Module):
         x = self.f0(x, grid)
         x = self.dropout(x) #Dropout
 
-        x = self.f1(x, grid)
-        x = self.dropout(x) #Dropout
+        # x = self.f1(x, grid)
+        # x = self.dropout(x) #Dropout
 
-        x = self.f2(x, grid) 
-        x = self.dropout(x) #Dropout
+        # x = self.f2(x, grid) 
+        # x = self.dropout(x) #Dropout
         
-        x = self.f3(x, grid)
-        x = self.dropout(x) #Dropout
+        # x = self.f3(x, grid)
+        # x = self.dropout(x) #Dropout
         
-        x = self.f4(x, grid)
-        x = self.dropout(x) #Dropout
+        # x = self.f4(x, grid)
+        # x = self.dropout(x) #Dropout
         
-        x = self.f5(x, grid) 
-        x = self.dropout(x) #Dropout
+        # x = self.f5(x, grid) 
+        # x = self.dropout(x) #Dropout
 
 
         x = x.permute(0, 2, 3, 4, 1)
