@@ -89,7 +89,7 @@ laplacian_stencil_4th = alpha * torch.tensor([[0, 0, -1/12, 0, 0],
                                        [0, 0, -1/12, 0, 0]]
                                        )
 
-laplacian_stencil_6th = torch.tensor([[0, 0, 0, 1/90, 0, 0, 0],
+laplacian_stencil_6th = alpha*torch.tensor([[0, 0, 0, 1/90, 0, 0, 0],
                                       [0, 0, 0, -3/20, 0, 0, 0],
                                       [0, 0, 0, 3/2, 0, 0, 0],
                                       [1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90],
@@ -97,6 +97,23 @@ laplacian_stencil_6th = torch.tensor([[0, 0, 0, 1/90, 0, 0, 0],
                                       [0, 0, 0, -3/20, 0, 0, 0],
                                       [0, 0, 0, 1/90, 0, 0, 0]], dtype=torch.float32)
 
+laplacian_stencil_8th = alpha*torch.tensor([
+    [-9,    0,     0,     0,     0,     0,     0,     0,    -9],
+    [0,   128,     0,     0,     0,     0,     0,   128,     0],
+    [0,     0, -1008,     0,     0,     0, -1008,     0,     0],
+    [0,     0,     0,  8064,     0,  8064,     0,     0,     0],
+    [0,     0,     0,     0, -14350,     0,     0,     0,     0],
+    [0,     0,     0,  8064,     0,  8064,     0,     0,     0],
+    [0,     0, -1008,     0,     0,     0, -1008,     0,     0],
+    [0,   128,     0,     0,     0,     0,     0,   128,     0],
+    [-9,    0,     0,     0,     0,     0,     0,     0,    -9]
+    ],dtype=torch.float32)/5040
+
+laplacian_stencil_biharmonic = alpha * torch.tensor([[0,0,1,0,0],
+                                           [0,2,-8,2,0],
+                                           [1,-8,1,-8,1],
+                                           [0,2,-8,2,0],
+                                           [0,0,1,0,0]], dtype=torch.float32)
 
 CS_stencil_2nd = beta * torch.tensor([[0, -1, 0],
                            [0, 0, 0],
@@ -109,9 +126,9 @@ u_tensor = torch.tensor(u, dtype=torch.float32)
 def conv_deriv_2d(f, stencil):
     return F.conv2d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=stencil.shape[0]//2).squeeze()
 
-u_xx_conv_2d = conv_deriv_2d(u_tensor[-10], three_p_stencil)
-u_yy_conv_2d = conv_deriv_2d(u_tensor[-10], three_p_stencil.T)
-u_xx_yy_conv_2d  = conv_deriv_2d(u_tensor[-10], laplacian_stencil_4th)
+# u_xx_conv_2d = conv_deriv_2d(u_tensor[-10], three_p_stencil)
+# u_yy_conv_2d = conv_deriv_2d(u_tensor[-10], three_p_stencil.T)
+# u_xx_yy_conv_2d  = conv_deriv_2d(u_tensor[-10], laplacian_stencil_4th)
 # %%
 def kernel_3d(stencil, axis):
     kernel_size = stencil.shape[0]
@@ -128,11 +145,12 @@ def kernel_3d(stencil, axis):
 def conv_deriv_3d(f, stencil):
     return F.conv3d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
-
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_2nd, axis=1))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
 u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_6th, axis=1))
-u_t_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(two_p_stencil, axis=2))
+# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_biharmonic, axis=1))
+# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_8th, axis=1))
+u_t_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(CS_stencil_2nd, axis=2))
 
 # stencil_xx_yy = torch.zeros(3,3,3)
 # stencil_xx_yy[: ,1, :] = five_p_stencil
@@ -157,7 +175,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 fig = plt.figure(figsize=(12, 8))
-idx = 1
+idx = -10
 
 # Selecting the axis-X making the bottom and top axes False. 
 plt.tick_params(axis='x', which='both', bottom=False, 
