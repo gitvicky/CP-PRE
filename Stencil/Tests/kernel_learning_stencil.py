@@ -10,7 +10,7 @@ Learning the required Convolutional Kernels using LBFGS
 Using the wave equation as the base test case for this experiment.
 """
 
-# %% x
+# %% 
 import os
 import numpy as np 
 import matplotlib.pyplot as plt 
@@ -213,14 +213,14 @@ plt.savefig('laplace.png')
 #Learning the inverse of the laplace 
 
 # 1D tranposed convolution for the inverse laplace
-class transp_conv_inv_laplace(nn.Module):
+class conv_inv_laplace(nn.Module):
     def __init__(self, activation=None):
-        super(transp_conv_inv_laplace, self).__init__()
+        super(conv_inv_laplace, self).__init__()
 
         #Convolutional Layers
         # self.transp_conv = nn.ConvTranspose2d(1, 1, (3,3), stride=1)
-        # self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
-        self.conv = nn.Conv2d(1, 1, (17,17), stride=1, padding=(8,8))
+        self.conv = nn.Conv2d(1, 1, (3,3), stride=1, padding=(1,1))
+        # self.conv = nn.Conv2d(1, 1, (17,17), stride=1, padding=(8,8))
 
     def forward(self, x):
         # x =self.transp_conv(x)
@@ -228,7 +228,7 @@ class transp_conv_inv_laplace(nn.Module):
         return x
     
 
-inv_laplace = transp_conv_inv_laplace().to(device)
+inv_laplace = conv_inv_laplace().to(device)
 
 configuration = {"Case": 'Inverse',
                  "Epochs": 10,
@@ -349,6 +349,132 @@ plt.savefig('inverse_laplace.png')
 #Closing the simvue run. 
 # run.close()                                                                                                                                                                        
 # %%
+#Learning the inverse Laplace using FFT based convolutions. 
+
+class spectral_conv_inv_laplace(nn.Module):
+    def __init__(self, activation=None):
+        super(spectral_conv_inv_laplace, self).__init__()
+
+        #Convolutional Layers
+        self.K = torch.nn.Parameter(torch.randn(128,128))
+        self.K.requires_grad = True
+
+    def forward(self, x):
+
+        x_fft = torch.fft.fft2(x)
+        kernel_fft = torch.fft.fft2(self.K)
+        dot_prod = x_fft * kernel_fft
+        y = torch.fft.ifft2(dot_prod)
+
+        return y.real
+
+inv_laplace = spectral_conv_inv_laplace().to(device)
+
+configuration = {"Case": 'Inverse',
+                 "Epochs": 100,
+                 "Batch Size": 1000,
+                #  "Optimizer": 'LBFGS',
+                 "Optimizer": 'Adam',
+                 "Learning Rate": 5e-3,
+                 "Scheduler Step": 1000,
+                 "Scheduler Gamma": 0.5,
+}
+# run = Run()
+# run.init(folder="/Residuals_UQ/stencil_inversion", tags=['Inverse Kernel', configuration['Optimizer'], 'FD'], metadata=configuration)
+
+loss_func = torch.nn.MSELoss()
+
+if configuration['Optimizer'] == 'LBFGS':
+    optimizer = torch.optim.LBFGS(inv_laplace.parameters(), lr=1, max_iter=20, max_eval=None, tolerance_grad=1e-07, tolerance_change=1e-09, history_size=100, line_search_fn=None)
+elif configuration['Optimizer'] == 'Adam':
+    optimizer = torch.optim.Adam(inv_laplace.parameters(), lr=configuration['Learning Rate'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+
+# %% 
+#Prepping the data. 
+X_train = uu_laplace
+Y_train = uu.view(uu.shape[0], 1, uu.shape[1], uu.shape[2])
+
+train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(X_train, Y_train), batch_size=configuration['Batch Size'], shuffle=True)
+
+# %% 
+
+#Defining the Closure required to evaluate LBFGS
+def closure():
+    optimizer.zero_grad()
+    y_out = inv_laplace(xx)
+    loss = loss_func(y_out, yy)
+    loss.backward()
+    return loss
+
+#Training the Transposed Convolutional Network 
+epochs = configuration['Epochs']
+loss_val = []
+for ii in tqdm(range(epochs)):    
+    for xx, yy in train_loader:
+        xx, yy = xx.to(device), yy.to(device)
+        if configuration['Optimizer'] == 'LBFGS':
+            loss = closure()        
+            optimizer.step(closure)
+        
+        elif configuration['Optimizer'] == 'Adam':
+            optimizer.zero_grad()
+            y_out = inv_laplace(xx)
+            loss = loss_func(y_out, yy)
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+    # run.log_metrics({'Train Loss': loss.item()})
+    print(loss.item())
+
+#Getting an output to plot 
+y_out = inv_laplace(xx)
+
+# %% 
+#Plotting 
+fig = plt.figure(figsize=(10, 5))
+
+mini = torch.min(yy[-1,0])
+maxi = torch.max(yy[-1,0])
+
+# plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
+plt.title('Inverse FD stencil')
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+
+ax = fig.add_subplot(1,2,1)
+pcm =ax.imshow(yy[-1,0][1:-1, 1:-1].detach().cpu().numpy(), cmap=cm.coolwarm, vmin=mini, vmax=maxi)
+ax.title.set_text('Actual Field')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+ax = fig.add_subplot(1,2,2)
+pcm =ax.imshow(y_out[-1,0].detach().cpu().numpy(), cmap=cm.coolwarm,  vmin=mini, vmax=maxi)
+ax.title.set_text('Retrieved Field')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+cbar.formatter.set_powerlimits((0, 0))
+
+# %% 
 
 # ################################################
 # #Learning the forward and inverse together using an Autoencoder 
