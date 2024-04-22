@@ -21,7 +21,7 @@ def trig_func(x_mesh, y_mesh, t_val):
     t = Symbol('t')
     
     # Define the function
-    # f = sin(x/t) + cos(y/t)#trig
+    # f = sin(x**2/t) + cos(2*y/t)#trig
     f =( 1 / (4 * pi * 0.1 * t)) * exp(-(x**2 + y**2) / (4 * 0.1 * t))#heat equation
     
     # Create lambdified functions for the function and derivatives
@@ -74,7 +74,7 @@ from torch.nn import functional as F
 #Some tests to ensure that the kernels are aligned to the correct axis. 
 #Compaing the Laplacian Operator implemented in 2D and 3D 
 
-alpha = 1/dx**2
+alpha = 1/(dx**2)
 # alpha = 1 
 beta = 1/(2*dt)
 
@@ -150,10 +150,10 @@ def conv_deriv_3d(f, stencil):
     return F.conv3d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_2nd, axis=1))
-# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
+u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_6th, axis=1))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_biharmonic, axis=1))
-u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(alpha*laplacian_stencil_8th, axis=1))
+# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(alpha*laplacian_stencil_8th, axis=1))
 u_t_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(beta*CS_stencil_2nd, axis=2))
 
 # stencil_xx_yy = torch.zeros(3,3,3)
