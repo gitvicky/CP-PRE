@@ -1,90 +1,72 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-26th March, 2024
-
-Tests to determine the position and axis of the stencils with respect to the spatio-temporal grids
-Initially deploying it on a random trig function adn then. 
-Deploying the Scheme on the 2D heat equation with an analytical solution. 
-"""
-
 # %% 
-from sympy import Symbol, sin, cos, diff, lambdify
-from sympy import *
+
 import numpy as np
-from tqdm import tqdm 
+import matplotlib.pyplot as plt
 
-def trig_func(x_mesh, y_mesh, t_val):
-    # Define the symbols
-    x = Symbol('x')
-    y = Symbol('y')
-    t = Symbol('t')
-    
-    # Define the function
-    # f = sin(x/t) + cos(y/t)#trig
-    f =( 1 / (4 * pi * 0.1 * t)) * exp(-(x**2 + y**2) / (4 * 0.1 * t))#heat equation
-    
-    # Create lambdified functions for the function and derivatives
-    f_lambda = lambdify((x, y, t), f, 'numpy')
-    df_dx_lambda = lambdify((x, y, t), diff(f, x, 2), 'numpy')
-    df_dy_lambda = lambdify((x, y, t), diff(f, y, 2), 'numpy')
-    df_dt_lambda = lambdify((x, y, t), diff(f, t), 'numpy')
-    
-    # Evaluate the function and derivatives using the meshgrids and t value
-    f_val = f_lambda(x_mesh, y_mesh, t_val)
-    df_dxx_val = df_dx_lambda(x_mesh, y_mesh, t_val)
-    df_dyy_val = df_dy_lambda(x_mesh, y_mesh, t_val)
-    df_dt_val = df_dt_lambda(x_mesh, y_mesh, t_val)
-    
-    return f_val, df_dxx_val, df_dyy_val, df_dt_val
+# Parameters
+Lx = 1.0  # Length of the domain in x-direction
+Ly = 1.0  # Length of the domain in y-direction
+Nx = 128  # Number of grid points in x-direction
+Ny = 128  # Number of grid points in y-direction
+dt = 0.001  # Time step
+Nt = 500  # Number of time steps
+c = 1.0  # Wave speed
 
-# Create a grid of points
-grid_res = 512
-x = np.linspace(-1, 1, grid_res)
-y = np.linspace(-1, 1, grid_res)
+# Grid spacing
+dx = Lx / (Nx - 1)
+dy = Ly / (Ny - 1)
+
+# Grid points
+x = np.linspace(0, Lx, Nx)
+y = np.linspace(0, Ly, Ny)
 X, Y = np.meshgrid(x, y)
 
-dx = x[-1] - x[-2]
-dt = 0.001
-t_range = np.arange(0.1,0.2+dt,dt)
-t_res = len(t_range)
+# Initial condition (2D Gaussian)
+sigma = 0.1
+x0 = Lx / 2
+y0 = Ly / 2
+u0 = np.exp(-((X - x0)**2 + (Y - y0)**2) / (2 * sigma**2))
 
+# Initialize solution arrays
+u = np.zeros((Nt, Ny, Nx))
+u[0] = u0
+u[1] = u0
 
-u = []
-u_t = []
-u_xx = []
-u_yy = []
+# Finite difference scheme
+for n in range(1, Nt - 1):
+    for i in range(1, Ny - 1):
+        for j in range(1, Nx - 1):
+            u[n+1, i, j] = 2 * u[n, i, j] - u[n-1, i, j] + (c * dt / dx)**2 * (u[n, i+1, j] - 2 * u[n, i, j] + u[n, i-1, j]) + (c * dt / dy)**2 * (u[n, i, j+1] - 2 * u[n, i, j] + u[n, i, j-1])
 
-for i, t in tqdm(enumerate(t_range)):
-    f_val, df_dxx_val, df_dyy_val, df_dt_val = trig_func(X, Y, t)
-    u.append(f_val)
-    u_xx.append(df_dxx_val)
-    u_yy.append(df_dyy_val)
-    u_t.append(df_dt_val)
+    # Dirichlet boundary conditions
+    u[n+1, :, 0] = 0
+    u[n+1, :, -1] = 0
+    u[n+1, 0, :] = 0
+    u[n+1, -1, :] = 0
 
-u = np.asarray(u)
-u_t = np.asarray(u_t)
-u_xx = np.asarray(u_xx)
-u_yy = np.asarray(u_yy)
+# Plot the solution at the final time step
+plt.figure()
+plt.contourf(X, Y, u[-1], cmap='plasma')
+plt.colorbar()
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('2D Wave Equation Solution')
+plt.show()
+# %%
 
-# %% 
-#Taking the derivatives using the Finite Difference Scheme with the Convolutional Kernels. 
-import torch 
-from torch.nn import functional as F
-#Some tests to ensure that the kernels are aligned to the correct axis. 
-#Compaing the Laplacian Operator implemented in 2D and 3D 
+import torch
+import torch.nn.functional as F 
 
 alpha = 1/dx**2
-# alpha = 1 
-beta = 1/(2*dt)
+beta = 1/dt**2
 
 three_p_stencil = torch.tensor([[0, 1, 0],
                            [0, -2, 0],
                            [0, 1, 0]], dtype=torch.float32)
 
-laplacian_stencil_2nd = torch.tensor([[0., -1., 0.],
-                       [-1., 4., -1.],
-                       [0., -1., 0.]])
+laplacian_stencil_2nd = torch.tensor([[0., 1., 0.],
+                       [1., -4., 1.],
+                       [0., 1., 0.]])
 
 laplacian_stencil_4th = torch.tensor([[0, 0, -1/12, 0, 0],
                                        [0, 0, 4/3, 0, 0],
@@ -149,35 +131,15 @@ def kernel_3d(stencil, axis):
 def conv_deriv_3d(f, stencil):
     return F.conv3d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
-# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_2nd, axis=1))
-# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
-# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_6th, axis=1))
-# u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_biharmonic, axis=1))
-u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(alpha*laplacian_stencil_8th, axis=1))
-u_t_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(beta*CS_stencil_2nd, axis=2))
-
-# stencil_xx_yy = torch.zeros(3,3,3)
-# stencil_xx_yy[: ,1, :] = five_p_stencil
-# u_xx_yy_conv_3d = F.conv3d(u_tensor.view(1,1,t_res,grid_res,grid_res), stencil_xx_yy.view(1,1,3,3,3),padding=1)
-
-# stencil_xx_yy = torch.zeros(5,5,5)
-# stencil_xx_yy[: ,1, :] = nine_p_stencil
-# u_xx_yy_conv_3d = F.conv3d(u_tensor.view(1,1,t_res,grid_res,grid_res), stencil_xx_yy.view(1,1,5,5,5),padding=2)
-
-# stencil_xx_yy = torch.zeros(7,7,7)
-# stencil_xx_yy[: ,1, :] = laplacian_stencil_6th
-# u_xx_yy_conv_3d = F.conv3d(u_tensor.view(1,1,t_res,grid_res,grid_res), stencil_xx_yy.view(1,1,7,7,7),padding=3)
-
-# stencil_t = torch.zeros(3,3,3)
-# stencil_t[: ,:, 1] = two_p_stencil
-# u_t_conv_3d = F.conv3d(u_tensor.view(1,1,t_res,grid_res,grid_res), stencil_t.view(1,1,3,3,3),padding=1)
+u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
+u_tt_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=2))
 
 # %%
-#Plotting the input, laplace, inverse 
+
 from matplotlib import pyplot as plt 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
-fig = plt.figure(figsize=(12, 8))
+fig = plt.figure(figsize=(12, 4))
 idx = -10
 
 # Selecting the axis-X making the bottom and top axes False. 
@@ -193,7 +155,7 @@ plt.gca().spines['right'].set_visible(False)
 plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
-ax = fig.add_subplot(2,2,1)
+ax = fig.add_subplot(1,3,1)
 pcm =ax.imshow(u_xx_yy_conv_3d[idx], cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
 ax.title.set_text(r'$(u_{xx} + u_{yy})$')
 ax.set_xlabel('x')
@@ -203,8 +165,8 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(2,2,2)
-pcm =ax.imshow(u_t_conv_3d[idx], cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax = fig.add_subplot(1,3,2)
+pcm =ax.imshow(u_tt_conv_3d[idx], cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
 ax.title.set_text(r'$u_t$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -213,19 +175,9 @@ cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(2,2,3)
-pcm =ax.imshow((u_xx[idx] + u_yy[idx]), cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
-ax.title.set_text(r'$(u_{xx} + u_{yy})$')
-ax.set_xlabel('x')
-ax.set_ylabel('Analytical')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
-
-ax = fig.add_subplot(2,2,4)
-pcm =ax.imshow(u_t[idx], cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
-ax.title.set_text(r'$u_t$')
+ax = fig.add_subplot(1,3,3)
+pcm =ax.imshow(u_tt_conv_3d[idx] - (c*dt/dx)**2*u_xx_yy_conv_3d[idx], cmap=cm.coolwarm)#,  vmin=mini, vmax=maxi)
+ax.title.set_text(r'$Residual')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
