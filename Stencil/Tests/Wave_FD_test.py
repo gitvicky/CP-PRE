@@ -156,6 +156,9 @@ def kernel_3d(stencil, axis):
 def conv_deriv_3d(f, stencil):
     return F.conv3d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
+kernel = kernel_3d(laplacian_stencil_2nd, axis=0)
+convolution = F.conv3d(u_tensor.view(1, 1, Nt+1, Nx, Ny), kernel.view(1, 1, kernel.shape[0], kernel.shape[1], kernel.shape[2]), padding=(1,1,1))[0,0]
+
 u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_2nd, axis=0))[:, 1:-1,1:-1]
 u_tt_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(three_p_stencil, axis=2))[:, 1:-1,1:-1]
 

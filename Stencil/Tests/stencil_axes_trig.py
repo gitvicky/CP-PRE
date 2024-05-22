@@ -150,7 +150,7 @@ def conv_deriv_3d(f, stencil):
     return F.conv3d(f.unsqueeze(0).unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_2nd, axis=1))
-u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=1))
+u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_4th, axis=0))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_6th, axis=1))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(laplacian_stencil_biharmonic, axis=1))
 # u_xx_yy_conv_3d = conv_deriv_3d(u_tensor, kernel_3d(alpha*laplacian_stencil_8th, axis=1))
@@ -194,7 +194,7 @@ plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
 ax = fig.add_subplot(2,2,1)
-pcm =ax.imshow(u_xx_yy_conv_3d[idx], cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_xx_yy_conv_3d[idx][1:-1, 1:-1], cmap=cm.coolwarm)#, vmin=mini, vmax=maxi)
 ax.title.set_text(r'$(u_{xx} + u_{yy})$')
 ax.set_xlabel('x')
 ax.set_ylabel('CK as FDS')

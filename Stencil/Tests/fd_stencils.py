@@ -10,6 +10,14 @@ import numpy as np
 import torch 
 
 #Order of differentiation, points, order of approximation, dimensionality
+
+def get_stencil(keys):
+    dims = keys['dims']
+    deriv_order = keys['deriv_orders']
+    taylor_order = keys['order']
+    points = keys['points']
+    
+
 deriv2_3p_2o_1d = torch.tensor([
                                 [0, 1, 0],
                                 [0, -2, 0],
