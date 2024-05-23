@@ -49,6 +49,7 @@ import sys
 import numpy as np
 from tqdm import tqdm 
 import torch
+import torch.nn.functional as F
 import matplotlib
 import matplotlib.pyplot as plt
 import time 
@@ -126,119 +127,90 @@ print('(MAE) Testing Error: %.3e' % (mae))
 #Denormalising the predictions
 pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 
+
 # %% 
 #Estimating the Residuals 
+# u_tt  = c**2 * (u_xx + u_yy)
 
-u_val = pred[:,0]
+u_val = u_out[:, 0] #Validating on Numerical Solution 
+# u_val = pred[:, 0] #Prediction
 u_val = u_val.permute(0, 3, 1, 2) #BS, Nt, Nx, Nt
 
 dx = x[-1] - x[-2]
 dy = y[-1] - y[-2]
 dt = t[-1] - t[-2]
 
-alpha = 1/(dt**2)
-beta = 1/(12*dx**2)
+alpha = 1/dx**2
+beta = 1/dt**2
 
 from fd_stencils import *
 
 # %% 
-#Standard
+#Obtaining the FD stencils 
+laplace_1D_stencil = get_stencil(dims=1, points=3, deriv_order=2, taylor_order=2)
+laplace_2D_stencil = get_stencil(dims=2, points=5, deriv_order=2, taylor_order=2)
 
-three_point_stencil  = torch.tensor([[0, 1, 0],
-                           [0, -2, 0],
-                           [0, 1, 0]], dtype=torch.float32)
+#Configuring the 3D Conv Kernels using the stencils. Spatial Axis = 0,1. Temporal Axis = 2. 
+spatial_laplace = kernel_3d(laplace_2D_stencil, axis=0)
+temp_laplace = kernel_3d(laplace_1D_stencil, axis=2)
 
-stencil_time = torch.zeros(3,3,3)
-stencil_t = alpha*three_point_stencil
-                           
-stencil_time[:, 1, :] = stencil_t
+def conv_deriv_3d(f, stencil):
+    return F.conv3d(f.unsqueeze(0), stencil.unsqueeze(0).unsqueeze(0), padding=(stencil.shape[0]//2, stencil.shape[1]//2, stencil.shape[2]//2)).squeeze()
 
-stencil_xx = torch.zeros(3,3,3)
-stencil_x = beta * three_point_stencil.T
-                           
-stencil_xx[1,: , :] = stencil_x
+u_xx_yy_conv_3d = conv_deriv_3d(u_val, spatial_laplace)[:, 1:-1,1:-1]
+u_tt_conv_3d = conv_deriv_3d(u_val, temp_laplace)[:, 1:-1,1:-1]
 
 
-stencil_yy = torch.zeros(3,3,3)
-stencil_y = beta * three_point_stencil.T
-                           
-stencil_yy[:, :, 1] = stencil_y
-
-
-stencil_time = stencil_time.view(1, 1, 3, 3, 3)
-stencil_xx = stencil_xx.view(1, 1, 3, 3, 3)
-stencil_yy =  stencil_yy.view(1, 1, 3, 3, 3)
-
-# deriv_stencil_conv = F.conv3d(u_tensor, stencil_time)[0,0] - F.conv3d(u_tensor, stencil_xx)[0,0] - F.conv3d(u_tensor, stencil_yy)[0,0]
-deriv_stencil_conv = F.conv3d(u_tensor, stencil_time, padding=1)[0,0] - F.conv3d(u_tensor, stencil_xx, padding=1)[0,0] - F.conv3d(u_tensor, stencil_yy, padding=1)[0,0]
-
-deriv_stencil_conv = deriv_stencil_conv.permute(1,2,0)
 # %% 
-#Test Plots
+from matplotlib import pyplot as plt 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+fig = plt.figure(figsize=(16, 4))
+idx = -10
 
-idx = 0
-t_idx = -5
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
 
-u_actual = pred_u[idx].numpy()
-u_pred = pred_set[idx].numpy()
-u_mae = np.abs(u_actual - u_pred)
+ax = fig.add_subplot(1,3,1)
+pcm =ax.imshow(u_xx_yy_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#, vmin=mini, vmax=maxi)
+ax.title.set_text(r'$(u_{xx} + u_{yy})$')
+ax.set_xlabel('x')
+ax.set_ylabel('CK as FDS')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-fig = plt.figure()
-mpl.rcParams['figure.figsize']=(14, 14)
-# plt.subplots_adjust(left=0.1, rght=0.9, bottom=0.1, top=0.9, wspace=0.5, hspace=0.1)
-
-fig = plt.figure()
-ax = fig.add_subplot(2,2,1)
-pcm =ax.imshow(u_actual[...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
-ax.title.set_text('Actual')
+ax = fig.add_subplot(1,3,2)
+pcm =ax.imshow(u_tt_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#,  vmin=mini, vmax=maxi)
+ax.title.set_text(r'$u_t$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-ax = fig.add_subplot(2,2,2)
-pcm =ax.imshow(u_pred[...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
-ax.title.set_text('Pred')
-ax.set_xlabel('x')
-# ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
-
-#Absolute Error 
-ax = fig.add_subplot(2,2,3)
-pcm =ax.imshow(u_mae[...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
-ax.title.set_text('Abs Error')
+ax = fig.add_subplot(1,3,3)
+pcm =ax.imshow(u_tt_conv_3d[idx] - (c*dt/dx)**2*u_xx_yy_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#,  vmin=mini, vmax=maxi)
+ax.title.set_text(r'$Residual$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
-#Residual Error 
-ax = fig.add_subplot(2,2,4)
-pcm =ax.imshow(deriv_stencil_conv[...,t_idx], cmap=cm.coolwarm, extent=[-1, 1, -1, 1])
-ax.title.set_text('Residual')
-ax.set_xlabel('x')
-# ax.set_ylabel('y')
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = fig.colorbar(pcm, cax=cax)
-cbar.formatter.set_powerlimits((0, 0))
+
 
 # %%
-#Exploring the calibration method. 
-# y = u_actual[...,t_idx]
-# y_tilde = u_pred[...,t_idx]
-# y_tilde_residual = deriv_stencil_conv[...,t_idx]
-# # %%
-
-# %%
-
-# %%
-

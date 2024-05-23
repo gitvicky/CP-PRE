@@ -8,14 +8,11 @@ Finite Difference Stencils
 """
 import numpy as np 
 import torch 
+import torch.nn.functional as F
 
 # Dimensionality,  Number of Points, Order of differentiation, Order of Approximation of the Taylor Series 
 
-def get_stencil(keys):
-    dims = keys['dims']
-    points = keys['points']
-    deriv_order = keys['deriv_order']
-    taylor_order = keys['taylor_order']
+def get_stencil(dims, points, deriv_order, taylor_order):
 
     if dims == 1:
         if points == 3 and deriv_order == 2 and taylor_order == 2:
@@ -33,9 +30,9 @@ def get_stencil(keys):
     elif dims == 2:
         if points == 5 and deriv_order == 2 and taylor_order == 2:
             return torch.tensor([
-                [0., -1., 0.],
-                [-1., 4., -1.],
-                [0., -1., 0.]
+                [0., 1., 0.],
+                [1., -4., 1.],
+                [0., 1., 0.]
             ], dtype=torch.float32)
         elif points == 9 and deriv_order == 2 and taylor_order == 4:
             return torch.tensor([
@@ -58,4 +55,15 @@ def get_stencil(keys):
 
     raise ValueError("Invalid stencil parameters")
 
+#If the data is BS, Nt, Nx, Ny -- then the axis=0,1 will be for spatial derivs and axis=2 wil be for time. 
+def kernel_3d(stencil, axis):
+    kernel_size = stencil.shape[0]
+    kernel = torch.zeros(kernel_size, kernel_size, kernel_size)
+    if axis == 0:
+        kernel[1,:,:] = stencil
+    elif axis ==1:
+            kernel[:,1,:] = stencil
+    elif axis ==2:
+            kernel[:,:,1] = stencil
+    return kernel
 
