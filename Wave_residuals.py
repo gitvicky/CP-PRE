@@ -99,7 +99,11 @@ x = torch.tensor(x, dtype=torch.float32)
 y = torch.tensor(y, dtype=torch.float32)
 
 u = torch.tensor(u_sol, dtype=torch.float32)#converting to torch 
-u = u.permute(1, 2, 0)#BS, Nx, Ny, Nt
+u = u.permute(1, 2, 0)#BS, Nx, Ny, Ntx_min = -1.0 # Minimum value of x
+x_max = 1.0 # maximum value of x
+y_min = -1.0 # Minimum value of y 
+y_max = 1.0 # Minimum value of y
+tend = 1
 u = u.unsqueeze(0).unsqueeze(1)#BS, vars, Nx, Ny, Nt
 
 u_in = u[...,:configuration['T_in']]
@@ -182,7 +186,7 @@ plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
 ax = fig.add_subplot(1,3,1)
-pcm =ax.imshow(u_xx_yy_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#, vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_xx_yy_conv_3d[idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
 ax.title.set_text(r'$(u_{xx} + u_{yy})$')
 ax.set_xlabel('x')
 ax.set_ylabel('CK as FDS')
@@ -192,7 +196,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 ax = fig.add_subplot(1,3,2)
-pcm =ax.imshow(u_tt_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#,  vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_tt_conv_3d[idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
 ax.title.set_text(r'$u_t$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -202,7 +206,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 ax = fig.add_subplot(1,3,3)
-pcm =ax.imshow(u_tt_conv_3d[idx] - (c*dt/dx)**2*u_xx_yy_conv_3d[idx], cmap='jet', origin='lower', extent=[0, Lx, 0, Ly])#,  vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_tt_conv_3d[idx] - (c*dt/dx)**2*u_xx_yy_conv_3d[idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
 ax.title.set_text(r'$Residual$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
