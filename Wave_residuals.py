@@ -100,17 +100,23 @@ u_in = u[...,:configuration['T_in']]
 u_out = u[...,configuration['T_in'] : configuration['T_in'] + configuration['T_out']]
 
 # %% 
-#Normalisation. - Setting up
-#Copy out Normalisation from the run itself. 
+#Normalisation
+norms = np.load(model_loc + '/FNO_Wave_amiable-charge_norms.npz')
+#Loading the Normaliation values
 in_normalizer = MinMax_Normalizer(u_in)
+in_normalizer.a = torch.tensor(norms['in_a'])
+in_normalizer.b = torch.tensor(norms['in_b'])
+
 out_normalizer = MinMax_Normalizer(u_out)
+out_normalizer.a = torch.tensor(norms['in_a'])
+out_normalizer.b = torch.tensor(norms['in_b'])
 
 u_in = in_normalizer.encode(u_in)
 u_out_encoded = out_normalizer.encode(u_out)
 
 # %%
 #Load the model. 
-model = FNO_multi( configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width'])
+model = FNO_multi(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width'])
 model.load_state_dict(torch.load(model_loc + '/FNO_Wave_customer-watt.pth', map_location='cpu'))
 
 #Model Predictions.
@@ -125,8 +131,8 @@ pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 # %% 
 #Estimating the Residuals ->  u_tt  = c**2 * (u_xx + u_yy)
 
-u_val = u_out[:, 0] #Validating on Numerical Solution 
-# u_val = pred[:, 0] #Prediction
+# u_val = u_out[:, 0] #Validating on Numerical Solution 
+u_val = pred[:, 0] #Prediction
 u_val = u_val.permute(0, 3, 1, 2) #BS, Nt, Nx, Nt
 
 dx = x[-1] - x[-2]
