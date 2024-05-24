@@ -81,11 +81,11 @@ class DerivConv():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain, order):
+    def __init__(self, domain, order, taylor_order=2):
         self.domain = domain #Axis across with the derivative is taken. 
         self.dims = len(self.domain) #Domain size
         self.order = order #order of derivation
-        self.stencil = get_stencil(self.dims, self.order)
+        self.stencil = get_stencil(self.dims, self.order, taylor_order)
 
         if self.domain == 't':
             self.axis = 2
@@ -100,7 +100,7 @@ class DerivConv():
         
         self.kernel = kernel_3d(self.stencil, self.axis)
 
-    
+
     def conv_deriv_3d(self, f, k):
         """
         Performs 3D derivative convolution.
@@ -112,7 +112,7 @@ class DerivConv():
         Returns:
             torch.Tensor: The result of the 3D derivative convolution.
         """
-        return F.conv3d(f.unsqueeze(0), k.unsqueeze(0).unsqueeze(0), padding=(k.shape[0]//2, k.shape[1]//2, k.shape[2]//2)).squeeze()
+        return F.conv3d(f.unsqueeze(1), k.unsqueeze(0).unsqueeze(0), padding=(k.shape[0]//2, k.shape[1]//2, k.shape[2]//2)).squeeze()
 
     
     def forward(self, field):

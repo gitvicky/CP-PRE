@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-12th Dec 2023
-
-FNO built using PyTorch to model the 2D Wave Equation. 
-Dataset buitl by changing by performing a LHS across the x,y pos and amplitude of the initial gaussian distibution
-Code for the spectral solver can be found in : https://github.com/farscape-project/PINNs_Benchmark
-
-----------------------------------------------------------------------------------------------------------------------------------------
-
-UQ by way of residuals. Residual estimation using Convolutional Kernels as Finite Difference Stencils
+Desc. 
 """
 
 # %%
@@ -39,8 +31,6 @@ configuration = {"Case": 'Wave',
                  "Pinball Gamma": 'NA',
                  "Dropout Rate": 0.1
                  }
-
-#%% 
 
 # %% 
 #Importing the necessary packages
@@ -111,6 +101,7 @@ u_out = u[...,configuration['T_in'] : configuration['T_in'] + configuration['T_o
 
 # %% 
 #Normalisation. - Setting up
+#Copy out Normalisation from the run itself. 
 in_normalizer = MinMax_Normalizer(u_in)
 out_normalizer = MinMax_Normalizer(u_out)
 
@@ -131,10 +122,8 @@ print('(MAE) Testing Error: %.3e' % (mae))
 #Denormalising the predictions
 pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 
-
 # %% 
-#Estimating the Residuals 
-# u_tt  = c**2 * (u_xx + u_yy)
+#Estimating the Residuals ->  u_tt  = c**2 * (u_xx + u_yy)
 
 u_val = u_out[:, 0] #Validating on Numerical Solution 
 # u_val = pred[:, 0] #Prediction
@@ -151,10 +140,18 @@ from Conv_Derivs import DerivConv
 #Defining the required Convolutional Operations. 
 D_tt = DerivConv('t', 2)
 D_xx_yy = DerivConv(('x','y'), 2)
+u_tt = D_tt(u_val)
+u_xx_yy = D_xx_yy(u_val)
 
-u_tt = D_tt(u_val)[:, 1:-1,1:-1]
-u_xx_yy = D_xx_yy(u_val)[:, 1:-1,1:-1]
+#Removing the Boundary Elements 
+if len(u_val)==1:
+    u_tt = u_tt[1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy[1:-1,1:-1,1:-1]
+else:
+    u_tt = u_tt[:, 1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy[:, 1:-1,1:-1,1:-1]
 
+#Residuals 
 u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
 
 # %% 
@@ -162,7 +159,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 fig = plt.figure(figsize=(20, 4))
-idx = 10
+t_idx = 10
 
 # Selecting the axis-X making the bottom and top axes False. 
 plt.tick_params(axis='x', which='both', bottom=False, 
@@ -178,7 +175,7 @@ plt.gca().spines['bottom'].set_visible(False)
 plt.gca().spines['left'].set_visible(False)
 
 ax = fig.add_subplot(1,4,1)
-pcm =ax.imshow(u_val[0,idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_val[0,t_idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
 ax.title.set_text(r'$(u)$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
@@ -189,7 +186,7 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 
 
 ax = fig.add_subplot(1,4,2)
-pcm =ax.imshow(u_xx_yy[idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_xx_yy[t_idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
 ax.title.set_text(r'$(u_{xx} + u_{yy})$')
 ax.set_xlabel('x')
 # ax.set_ylabel('y')
@@ -199,7 +196,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 ax = fig.add_subplot(1,4,3)
-pcm =ax.imshow(u_tt[idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_tt[t_idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
 ax.title.set_text(r'$u_t$')
 ax.set_xlabel('x')
 # ax.set_ylabel('y')
@@ -209,7 +206,7 @@ cbar = fig.colorbar(pcm, cax=cax)
 ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
 ax = fig.add_subplot(1,4,4)
-pcm =ax.imshow(u_residual[idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
+pcm =ax.imshow(u_residual[t_idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
 ax.title.set_text(r'$Residual$')
 ax.set_xlabel('x')
 # ax.set_ylabel('y')

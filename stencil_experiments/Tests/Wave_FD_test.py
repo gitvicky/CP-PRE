@@ -101,7 +101,6 @@ u_all, dx, dy, dt = wave_equation_2d(Lx, Ly, Nx, Ny, T, Nt, c)
 # Plot the solution at different time steps
 plot_solution(u_all, Lx, Ly, Nt)
 # %%
-
 import torch
 import torch.nn.functional as F 
 
