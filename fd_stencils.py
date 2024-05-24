@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 # Dimensionality,  Number of Points, Order of differentiation, Order of Approximation of the Taylor Series 
 
-def get_stencil(dims, points, deriv_order, taylor_order):
+def get_stencil(dims, points, deriv_order, taylor_order=2):
 
     if dims == 1:
         if points == 3 and deriv_order == 2 and taylor_order == 2:
