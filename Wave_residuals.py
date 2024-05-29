@@ -7,30 +7,27 @@ Desc.
 # %%
 configuration = {"Case": 'Wave',
                  "Field": 'u',
-                 "Type": 'FNO',
+                 "Model": 'FNO',
                  "Epochs": 500,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
                  "Scheduler Step": 100,
                  "Scheduler Gamma": 0.5,
-                 "Activation": 'Tanh',
+                 "Activation": 'GeLU',
+                 "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
-                 "Instance Norm": 'No',
-                 "Log Normalisation":  'No',
-                 "Physics Normalisation": 'Yes',
                  "T_in": 20,    
                  "T_out": 60,
                  "Step": 10,
-                 "Width": 32, 
+                 "Width_time": 32, 
+                 "Width_vars": 0,  
                  "Modes": 8,
                  "Variables":1, 
-                 "Noise":0.0, 
                  "Loss Function": 'LP',
-                 "UQ": 'Dropout', #None, Dropout
-                 "Pinball Gamma": 'NA',
-                 "Dropout Rate": 0.1
+                 "UQ": 'None', #None, Dropout
                  }
+
 
 # %% 
 #Importing the necessary packages
@@ -73,9 +70,9 @@ x_max = 1.0 # maximum value of x
 y_min = -1.0 # Minimum value of y 
 y_max = 1.0 # Minimum value of y
 tend = 1
-Lambda = 20 #Gaussian Amplitude
-aa = 0.25 #X-pos
-bb = 0.25 #Y-pos
+Lambda = 40 #Gaussian Amplitude
+aa = 0.0 #X-pos
+bb = 0.0 #Y-pos
 c = 1.0 #Wave Speed <=1.0
 
 #Initialising the Solver
@@ -101,7 +98,7 @@ u_out = u[...,configuration['T_in'] : configuration['T_in'] + configuration['T_o
 
 # %% 
 #Normalisation
-norms = np.load(model_loc + '/FNO_Wave_amiable-charge_norms.npz')
+norms = np.load(model_loc + '/FNO_Wave_null-shape_norms.npz')
 #Loading the Normaliation values
 in_normalizer = MinMax_Normalizer(u_in)
 in_normalizer.a = torch.tensor(norms['in_a'])
@@ -116,14 +113,14 @@ u_out_encoded = out_normalizer.encode(u_out)
 
 # %%
 #Load the model. 
-model = FNO_multi(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width'])
-model.load_state_dict(torch.load(model_loc + '/FNO_Wave_customer-watt.pth', map_location='cpu'))
+model = FNO_multi(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
+model.load_state_dict(torch.load(model_loc + '/FNO_Wave_null-shape.pth', map_location='cpu'))
 
 #Model Predictions.
 pred_encoded, mse, mae = validation_AR(model, u_in, u_out_encoded, configuration['Step'], configuration['T_out'])
 
-print('(MSE) Testing Error: %.3e' % (mse))
-print('(MAE) Testing Error: %.3e' % (mae))
+print('(MSE) Error: %.3e' % (mse))
+print('(MAE) Error: %.3e' % (mae))
 
 #Denormalising the predictions
 pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
@@ -165,7 +162,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 fig = plt.figure(figsize=(20, 4))
-t_idx = 10
+t_idx = 1
 
 # Selecting the axis-X making the bottom and top axes False. 
 plt.tick_params(axis='x', which='both', bottom=False, 
@@ -182,7 +179,7 @@ plt.gca().spines['left'].set_visible(False)
 
 ax = fig.add_subplot(1,4,1)
 pcm =ax.imshow(u_val[0,t_idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
-ax.title.set_text(r'$(u)$')
+ax.set_title(r'$u$')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -193,7 +190,7 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 
 ax = fig.add_subplot(1,4,2)
 pcm =ax.imshow(u_xx_yy[t_idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
-ax.title.set_text(r'$(u_{xx} + u_{yy})$')
+ax.set_title(r'$(u_{xx} + u_{yy})$')
 ax.set_xlabel('x')
 # ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -203,7 +200,7 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 
 ax = fig.add_subplot(1,4,3)
 pcm =ax.imshow(u_tt[t_idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
-ax.title.set_text(r'$u_t$')
+ax.set_title(r'$u_t$')
 ax.set_xlabel('x')
 # ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
@@ -213,7 +210,64 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 
 ax = fig.add_subplot(1,4,4)
 pcm =ax.imshow(u_residual[t_idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
-ax.title.set_text(r'$Residual$')
+ax.set_title(r'$Residual$')
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+# %%
+fig = plt.figure(figsize=(12, 12))
+
+# Selecting the axis-X making the bottom and top axes False. 
+plt.tick_params(axis='x', which='both', bottom=False, 
+                top=False, labelbottom=False) 
+  
+# Selecting the axis-Y making the right and left axes False 
+plt.tick_params(axis='y', which='both', right=False, 
+                left=False, labelleft=False) 
+  # Remove frame
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
+plt.gca().spines['bottom'].set_visible(False)
+plt.gca().spines['left'].set_visible(False)
+
+ax = fig.add_subplot(2,2,1)
+pcm =ax.imshow(pred[0, 0,...,t_idx] , cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
+ax.set_title(r'$u$', pad=20, fontsize=20)
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+
+ax = fig.add_subplot(2,2,2)
+pcm =ax.imshow(u_out[0,0,...,t_idx], cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
+ax.set_title(r'$\tilde u$' ,pad=20, fontsize=20)
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(2,2,3)
+pcm =ax.imshow(abs(pred[0,0,...,t_idx] - u_out[0,0,...,t_idx]) , cmap='jet', origin='lower', extent=[x_min, x_max, y_min, y_max])#, vmin=mini, vmax=maxi)
+ax.set_title(r'$| \tilde u$ - u|', pad=20, fontsize=20)
+ax.set_xlabel('x')
+# ax.set_ylabel('y')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = fig.colorbar(pcm, cax=cax)
+ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
+
+ax = fig.add_subplot(2,2,4)
+pcm =ax.imshow(u_residual[t_idx], cmap='jet', origin='lower',extent=[x_min, x_max, y_min, y_max])#,  vmin=mini, vmax=maxi)
+ax.set_title(r'$ \frac{\partial^2 u}{\partial t^2 } - c^2 (\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2})$', pad=20, fontsize=20)
 ax.set_xlabel('x')
 # ax.set_ylabel('y')
 divider = make_axes_locatable(ax)
