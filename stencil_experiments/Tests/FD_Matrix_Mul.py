@@ -71,12 +71,10 @@ stencil = np.array([[0, 1, 0],
 
 stencil_center = (1, 1)  # Center of the stencil
 nx, ny = grid_size, grid_size
-import tracemalloc
-tracemalloc.start()
 
+# %% 
 fwd_laplace = W = finite_difference_matrix_2d(nx, ny, stencil, stencil_center) #fwd_laplace
 inv_laplace = np.linalg.inv(W)
-
 
 # %%
 fwd_laplace_soln = Y = np.matmul(W, uu.reshape(-1)).reshape(nx, ny)
@@ -86,7 +84,7 @@ inv_laplace_soln = X_ = np.matmul(inv_laplace, Y.reshape(-1)).reshape(nx, ny)
 #Inverting a block diagonal matrix -- look into the scipy sparse matrix library
 #https://docs.scipy.org/doc/scipy/reference/sparse.html
 
-%timeit conj_grad = scipy.sparse.linalg.cg(W, Y.flatten())[0]
+conj_grad = scipy.sparse.linalg.cg(W, Y.flatten())[0]
 conj_grad = np.reshape(conj_grad, (grid_size, grid_size))
 # %%
 #Plotting the input, laplace, inverse 
@@ -161,22 +159,22 @@ ax.tick_params(which='both', labelbottom=False, labelleft=False, left=False, bot
 #               [1, 2, 3],
 #               [1, 3, 6]])
 
-A = W #weight matrix
-def cholesky_inverse(A):
-    # Perform Cholesky decomposition
-    L = np.linalg.cholesky(A)
+# A = W #weight matrix
+# def cholesky_inverse(A):
+#     # Perform Cholesky decomposition
+#     L = np.linalg.cholesky(A)
 
-    # Compute the inverse of L
-    L_inv = np.linalg.inv(L)
+#     # Compute the inverse of L
+#     L_inv = np.linalg.inv(L)
 
-    # # Compute the inverse of L^T
-    # L_T_inv = np.linalg.inv(L.T)
-    L_T_inv = L_inv.T
+#     # # Compute the inverse of L^T
+#     # L_T_inv = np.linalg.inv(L.T)
+#     L_T_inv = L_inv.T
 
-    # Compute the inverse of A
-    A_inv = np.dot(L_T_inv, L_inv)
+#     # Compute the inverse of A
+#     A_inv = np.dot(L_T_inv, L_inv)
 
-    return A_inv
+#     return A_inv
 
 # %timeit A_inverse = np.linalg.inv(A)
 # %timeit A_cholesky = cholesky_inverse(A)
@@ -203,7 +201,6 @@ def fwd_laplace_stencil(X):
 
 X_torch = torch.tensor(X, dtype=torch.float32)
 fwd_laplace_conv = fwd_laplace_stencil(X_torch.view(1, 1, X_torch.shape[0], X_torch.shape[1]))[0,0]
-
 
 # %%
 #Comparing the Fourier based method. 

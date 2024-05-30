@@ -29,7 +29,6 @@ kernel = torch.tensor([[0., 1., 0.],
                        [0., 1., 0.]])
 
 
-
 # signal  = signal.view(1, 1, grid_size, grid_size)
 # kernel = kernel.view(1, 1, 3, 3)
 

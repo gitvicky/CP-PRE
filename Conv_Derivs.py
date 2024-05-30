@@ -11,7 +11,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 def get_stencil(dims, deriv_order, taylor_order=2):
 
     if dims == 1:
@@ -94,6 +93,8 @@ class DerivConv():
         elif self.domain == 'y':
             self.axis = 1
         elif self.domain == ('x','y'):
+            self.axis = 0
+        elif self.domain == ('x', 'y', 't'):
             self.axis = 0
         else:
             raise ValueError("Invalid Domain. Must be either x,y or t")
