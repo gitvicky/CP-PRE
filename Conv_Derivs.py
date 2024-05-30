@@ -80,27 +80,30 @@ class DerivConv():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain, order, taylor_order=2):
-        self.domain = domain #Axis across with the derivative is taken. 
-        self.dims = len(self.domain) #Domain size
-        self.order = order #order of derivation
-        self.stencil = get_stencil(self.dims, self.order, taylor_order)
+    def __init__(self, domain=None, order=None, taylor_order=2):
 
-        if self.domain == 't':
-            self.axis = 2
-        elif self.domain == 'x':
-            self.axis = 0
-        elif self.domain == 'y':
-            self.axis = 1
-        elif self.domain == ('x','y'):
-            self.axis = 0
-        elif self.domain == ('x', 'y', 't'):
-            self.axis = 0
-        else:
-            raise ValueError("Invalid Domain. Must be either x,y or t")
-        
-        self.kernel = kernel_3d(self.stencil, self.axis)
+        try: 
+            self.domain = domain #Axis across with the derivative is taken. 
+            self.dims = len(self.domain) #Domain size
+            self.order = order #order of derivation
+            self.stencil = get_stencil(self.dims, self.order, taylor_order)
 
+            if self.domain == 't':
+                self.axis = 2
+            elif self.domain == 'x':
+                self.axis = 0
+            elif self.domain == 'y':
+                self.axis = 1
+            elif self.domain == ('x','y'):
+                self.axis = 0
+            elif self.domain == ('x', 'y', 't'):
+                self.axis = 0
+            else:
+                raise ValueError("Invalid Domain. Must be either x,y or t")
+            
+            self.kernel = kernel_3d(self.stencil, self.axis)
+        except:
+            pass
 
     def conv_deriv_3d(self, f, k):
         """
@@ -143,4 +146,3 @@ class DerivConv():
         outputs = self.forward(inputs)
         return outputs
     
-

@@ -157,6 +157,20 @@ else:
 
 #Residuals 
 u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
+
+# %% Additive Kernels 
+D = DerivConv()
+D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
+u_residual_additive = D(u_val)
+
+# %% 
+# Example values to plot
+t_idx = 10
+values = [u_residual_additive[t_idx], u_residual[t_idx]]
+titles = ["Additive Kernels", "Individual Kernels"]
+
+plot_subplots(values, titles)
+
 # %% 
 #Plotting the Gradients
 t_idx = 10
@@ -317,16 +331,3 @@ field_fft = torch.fft.fftn(u_val, dim=(1,2,3))#t,x,y
 kernel_fft = torch.fft.fftn(kernel_pad)
 inv_kernel_fft = 1 / (kernel_fft + 1e-6)
 u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
-
-#Differentiation using the additive kernel 
-u_res = torch.nn.functional.conv3d(u_val.unsqueeze(1), kernel.unsqueeze(0).unsqueeze(0), padding=(kernel.shape[0]//2, kernel.shape[1]//2, kernel.shape[2]//2)).squeeze()[1:-1,1:-1,1:-1]
-
-# %%
-
-# Example values to plot
-t_idx = 10
-values = [u_res[t_idx], u_residual[t_idx]]
-titles = ["Additive Kernels", "Individual Kernels"]
-
-plot_subplots(values, titles)
-# %%
