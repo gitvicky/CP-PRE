@@ -4,7 +4,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 
 
-def plot_subplots(values, titles, flatten=False):
+def subplots_2d(values, titles, flatten=False):
     num_subplots = len(values)
     
     # Calculate the number of rows and columns for the subplots

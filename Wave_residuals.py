@@ -49,7 +49,7 @@ from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
 
-from plot_tools import plot_subplots
+from plot_tools import subplots_2d
 
 # %% 
 #Settung up locations. 
@@ -169,7 +169,7 @@ t_idx = 10
 values = [u_residual_additive[t_idx], u_residual[t_idx]]
 titles = ["Additive Kernels", "Individual Kernels"]
 
-plot_subplots(values, titles)
+subplots_2d(values, titles)
 
 # %% 
 #Plotting the Gradients
@@ -184,7 +184,7 @@ titles = [r'$u$',
           r'$u_{tt}$',
           r'$Residual$']
 
-plot_subplots(values, titles, flatten=True)
+subplots_2d(values, titles, flatten=True)
 
 # %%
 #Plotting the fields, prediction, abs error and the residual
@@ -201,7 +201,7 @@ titles = [r'$u$',
           r'$ \frac{\partial^2 \tilde u}{\partial t^2 } - c^2 (\frac{\partial^2 \tilde u}{\partial x^2} + \frac{\partial^2 \tilde u}{\partial y^2})$'
           ]
 
-plot_subplots(values, titles)
+subplots_2d(values, titles)
 
 # %%%
 # Side Quest of veryfying via the matrix multiplication method
@@ -331,3 +331,8 @@ field_fft = torch.fft.fftn(u_val, dim=(1,2,3))#t,x,y
 kernel_fft = torch.fft.fftn(kernel_pad)
 inv_kernel_fft = 1 / (kernel_fft + 1e-6)
 u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
+
+values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
+titles = ['Actual', 'Retrieved', 'Abs Diff']
+subplots_2d(values, titles)
+# %% 
