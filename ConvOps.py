@@ -3,7 +3,8 @@
 """
 24th May, 2024
 
-Wrapper for Implementing Convolutional Operator as the Differential Operator with a Finite Difference Scheme. 
+Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator 
+- prefefined using a Finite Difference Scheme. 
 
 """
 import numpy as np 
@@ -70,10 +71,17 @@ def kernel_3d(stencil, axis):
     
     return kernel
 
+def pad_kernel(grid, kernel):#Could go into the deriv conv class
+    kernel_size = kernel.shape[0]
+    bs, nt, nx, ny = grid.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]
+    return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, ny-kernel_size, 0, nt-kernel_size), "constant", 0)
 
-class DerivConv():
+
+
+class ConvOperator():
     """
-    A class for performing derivative convolutions on a given domain.
+    A class for performing convolutions as a derivative or integrative operation on a given domain.
+    By default the class instance evaluates the derivative
 
     Args:
         domain (str or tuple): The domain across which the derivative is taken.
@@ -105,7 +113,7 @@ class DerivConv():
         except:
             pass
 
-    def conv_deriv_3d(self, f, k):
+    def convolution(self, field, kernel=None):
         """
         Performs 3D derivative convolution.
 
@@ -116,9 +124,62 @@ class DerivConv():
         Returns:
             torch.Tensor: The result of the 3D derivative convolution.
         """
-        return F.conv3d(f.unsqueeze(1), k.unsqueeze(0).unsqueeze(0), padding=(k.shape[0]//2, k.shape[1]//2, k.shape[2]//2)).squeeze()
+        if kernel != None: 
+            self.kernel = kernel
 
+        return F.conv3d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2, self.kernel.shape[2]//2)).squeeze()
     
+
+    def spectral_convolution(self, field, kernel=None):
+        """
+        Performs spectral convolution using the convolution theorem 
+
+        f * g = \hat{f} . \hat{g}
+
+        Args:
+            f (torch.Tensor): The input field tensor.
+            k (torch.Tensor): The convolution kernel tensor.
+
+        Returns:
+            torch.Tensor: The result of the 3D derivative convolution.
+        """ 
+        if kernel != None: 
+            self.kernel = kernel
+
+        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        kernel_pad = pad_kernel(field.shape, self.kernel)
+        kernel_fft = torch.fft.fftn(kernel_pad)
+        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+
+        return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2,3)).real
+
+
+    def integrate(self, field, kernel=None, eps=1e-6):
+
+        """
+        Performs Integration using the convolution theorem 3D derivative convolution.
+        
+        f * g * h = f  ; h =  1 / (g+eps)
+        
+        Args:
+            field (torch.Tensor): The input field tensor.
+            kernel (torch.Tensor): The convolution kernel tensor.
+            eps (float): Avoiding NaNs
+        Returns:
+            torch.Tensor: The result of the 3D Integration Operation. 
+        """
+        
+        if kernel != None: 
+            self.kernel = kernel
+        
+        kernel_pad = pad_kernel(field, self.kernel)
+        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        kernel_fft = torch.fft.fftn(kernel_pad)
+        inv_kernel_fft = 1 / (kernel_fft + eps)
+        u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
+        return u_integrate
+
+
     def forward(self, field):
         """
         Performs the forward pass of the derivative convolution.
@@ -129,7 +190,7 @@ class DerivConv():
         Returns:
             torch.Tensor: The result of the derivative convolution.
         """
-        return self.conv_deriv_3d(field, self.kernel)
+        return self.convolution(field, self.kernel)
 
     
     def __call__(self, inputs):

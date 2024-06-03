@@ -72,8 +72,8 @@ y_min = -1.0 # Minimum value of y
 y_max = 1.0 # Minimum value of y
 tend = 1
 Lambda = 40 #Gaussian Amplitude
-aa = 0.0 #X-pos
-bb = 0.0 #Y-pos
+aa = 0.25 #X-pos
+bb = 0.25 #Y-pos
 c = 1.0 #Wave Speed <=1.0
 
 #Initialising the Solver
@@ -140,26 +140,26 @@ dt = t[-1] - t[-2]
 alpha = 1/dx**2
 beta = 1/dt**2
 
-from Conv_Derivs import DerivConv
+from ConvOps import ConvOperator
 #Defining the required Convolutional Operations. 
-D_tt = DerivConv('t', 2)
-D_xx_yy = DerivConv(('x','y'), 2)
+D_tt = ConvOperator('t', 2)
+D_xx_yy = ConvOperator(('x','y'), 2)
 u_tt = D_tt(u_val)
 u_xx_yy = D_xx_yy(u_val)
 
 #Removing the Boundary Elements 
 if len(u_val)==1:
-    u_tt = u_tt[1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy[1:-1,1:-1,1:-1]
+    u_tt = u_tt#[1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy#[1:-1,1:-1,1:-1]
 else:
-    u_tt = u_tt[:, 1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy[:, 1:-1,1:-1,1:-1]
+    u_tt = u_tt#[:, 1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy#[:, 1:-1,1:-1,1:-1]
 
 #Residuals 
 u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
 
 # %% Additive Kernels 
-D = DerivConv()
+D = ConvOperator()
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 u_residual_additive = D(u_val)
 
@@ -209,7 +209,7 @@ def verify_FD_Matrix_Mul():
 
   #Estimating the residuals using the matrix multiplication methods. 
   from FinDiff_MM import finite_difference_matrix_2d
-  from Conv_Derivs import get_stencil
+  from ConvOps import get_stencil
 
   stencil = get_stencil(dims=2, deriv_order=2)
   stencil_center = (1,1)
@@ -295,44 +295,22 @@ def verify_FD_Matrix_Mul():
 #Performing the Inverse mapping from the Residuals to the Fields
 #############################################################################
 
-#Using the Convolution Theorem
-# f * g * h = f 
-
-#Padding the kernels
-def pad_kernel(kernel, grid):#Could go into the deriv conv class
-    kernel_size = kernel.shape[0]
-    bs, nt, nx, ny = grid.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]
-    return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, ny-kernel_size, 0, nt-kernel_size), "constant", 0)
-
-d_tt_kernel = D_tt.kernel
-d_xx_yy_kernel = D_xx_yy.kernel
-
-
-# d_tt_pad = pad_kernel(d_tt_kernel, u_val)
-# d_xx_yy_pad = pad_kernel(d_xx_yy_kernel, u_val)
-
-# field_fft = torch.fft.fftn(u_val, dim=(1,2,3))#t,x,y
-# d_tt_fft = torch.fft.fftn(d_tt_pad)#could go into the class and have conv deriv become the conv operator 
-# d_xx_yy_fft = torch.fft.fftn(d_xx_yy_pad)
-
-# eps=1e-6
-# inv_d_tt_fft = 1 / (d_tt_fft + eps)
-# inv_d_xx_yy_fft = 1 / (d_xx_yy_fft + eps)
-
-# u_integrate_t = torch.fft.ifftn(field_fft * d_tt_fft * inv_d_tt_fft, dim=(1,2,3)).real
-# u_integrate_xy = torch.fft.ifftn(field_fft * d_xx_yy_fft * inv_d_xx_yy_fft, dim=(1,2,3)).real
-
-# u_integrate =  u_integrate_t - (c*dt/dx)**2 * u_integrate_xy
-
-#Integrating using a single kernel - additive kernels 
-kernel = d_tt_kernel - (c*dt/dx)**2 * d_xx_yy_kernel
-kernel_pad = pad_kernel(kernel, u_val)
-field_fft = torch.fft.fftn(u_val, dim=(1,2,3))#t,x,y
-kernel_fft = torch.fft.fftn(kernel_pad)
-inv_kernel_fft = 1 / (kernel_fft + 1e-6)
-u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
+u_integrate = D.integrate(u_val)
 
 values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
 titles = ['Actual', 'Retrieved', 'Abs Diff']
 subplots_2d(values, titles)
 # %% 
+# #Attempting to use the residual within the fourier space. 
+
+# kernel = D.kernel
+# kernel_pad = pad_kernel(kernel, u_res)
+# field_fft = torch.fft.fftn(u_res, dim=(1,2,3))#t,x,y
+# kernel_fft = torch.fft.fftn(kernel_pad)
+# inv_kernel_fft = 1 / (kernel_fft + 1e-6)
+# u_integrate = torch.fft.ifftn(field_fft * inv_kernel_fft, dim=(1,2,3)).real
+
+# values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
+# titles = ['Actual', 'Retrieved', 'Abs Diff']
+# subplots_2d(values, titles)
+# %%
