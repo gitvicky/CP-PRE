@@ -89,7 +89,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, taylor_order=2):
+    def __init__(self, domain=None, order=None, scale=None, taylor_order=2):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
@@ -111,6 +111,7 @@ class ConvOperator():
                 raise ValueError("Invalid Domain. Must be either x,y or t")
             
             self.kernel = kernel_3d(self.stencil, self.axis)
+            self.kernel = scale*self.kernel
         except:
             pass
 

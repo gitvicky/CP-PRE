@@ -76,11 +76,10 @@ bb = 0.25 #Y-pos
 c = 1.0 #Wave Speed <=1.0
 
 #Initialising the Solver
-from Neural_PDE.Numerical_Solvers.Wave import Wave_2D_Spectral
-solver = Wave_2D_Spectral.Wave_2D(Nx, x_min, x_max, tend, c, Lambda, aa , bb)
+from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import Wave_2D
+solver = Wave_2D(Nx, x_min, x_max, tend, c)
+x, y, t, u_sol = solver.solve(Lambda, aa, bb)
 
-#Solving and obtaining the solution. 
-x, y, t, u_sol = solver.solve() #solution shape -> t, x, y
 t, u_sol = t[::5], u_sol[::5]
 
 x = torch.tensor(x, dtype=torch.float32)
@@ -106,15 +105,15 @@ in_normalizer.a = torch.tensor(norms['in_a'])
 in_normalizer.b = torch.tensor(norms['in_b'])
 
 out_normalizer = MinMax_Normalizer(u_out)
-out_normalizer.a = torch.tensor(norms['in_a'])
-out_normalizer.b = torch.tensor(norms['in_b'])
+out_normalizer.a = torch.tensor(norms['out_a'])
+out_normalizer.b = torch.tensor(norms['out_b'])
 
 u_in = in_normalizer.encode(u_in)
 u_out_encoded = out_normalizer.encode(u_out)
 
 # %%
 #Load the model. 
-model = FNO_multi(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
+model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
 model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
 
 #Model Predictions.
@@ -131,7 +130,7 @@ pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 
 # u_val = u_out[:, 0] #Validating on Numerical Solution 
 u_val = pred[:, 0] #Prediction
-u_val = u_val.permute(0, 3, 1, 2) #BS, Nt, Nx, Nt
+u_val = u_val.permute(0, 3, 1, 2) #BS, Nt, Nx, Ny
 
 dx = np.asarray(x[-1] - x[-2])
 dy = np.asarray(y[-1] - y[-2])
@@ -162,10 +161,10 @@ u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
 # %% Additive Kernels 
 D = ConvOperator()
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
-u_residual_additive = D(u_val)
+u_residual_additive = D(u_val)[1:-1,1:-1,1:-1]
 
 #Spectral convolutions 
-u_residual_sc = D.spectral_convolution(u_val)[0]
+u_residual_sc = D.spectral_convolution(u_val)[0][1:-1,1:-1,1:-1]
 # %% 
 # Example values to plot
 t_idx = 10
@@ -303,17 +302,5 @@ u_integrate = D.integrate(u_val)
 values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
 titles = ['Actual', 'Retrieved', 'Abs Diff']
 subplots_2d(values, titles)
-# %% 
-# #Attempting to use the residual within the fourier space. 
 
-# kernel = D.kernel
-# kernel_pad = pad_kernel(kernel, u_res)
-# field_fft = torch.fft.fftn(u_res, dim=(1,2,3))#t,x,y
-# kernel_fft = torch.fft.fftn(kernel_pad)
-# inv_kernel_fft = 1 / (kernel_fft + 1e-6)
-# u_integrate = torch.fft.ifftn(field_fft * inv_kernel_fft, dim=(1,2,3)).real
-
-# values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
-# titles = ['Actual', 'Retrieved', 'Abs Diff']
-# subplots_2d(values, titles)
 # %%
