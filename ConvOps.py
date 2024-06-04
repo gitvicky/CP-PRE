@@ -6,6 +6,7 @@
 Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator 
 - prefefined using a Finite Difference Scheme. 
 
+Data used for all operations should be in the shape: BS, Nt, Nx, Ny
 """
 import numpy as np 
 import torch 
@@ -147,7 +148,7 @@ class ConvOperator():
             self.kernel = kernel
 
         field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
-        kernel_pad = pad_kernel(field.shape, self.kernel)
+        kernel_pad = pad_kernel(field, self.kernel)
         kernel_fft = torch.fft.fftn(kernel_pad)
         field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
 

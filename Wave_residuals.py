@@ -28,7 +28,6 @@ configuration = {"Case": 'Wave',
                  "UQ": 'None', #None, Dropout
                  }
 
-
 # %% 
 #Importing the necessary packages
 import os 
@@ -52,7 +51,7 @@ from Neural_PDE.Utils.training_utils import *
 from plot_tools import subplots_2d
 
 # %% 
-#Settung up locations. 
+#Setting up locations. 
 file_loc = os.getcwd()
 # data_loc = file_loc + '/Data'
 model_loc = file_loc + '/Weights'
@@ -65,7 +64,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # %% 
 # Generating the data through simulation:
 
-Nx = 33 # Mesh Discretesiation 
+Nx = 64 # Mesh Discretesiation 
 x_min = -1.0 # Minimum value of x
 x_max = 1.0 # maximum value of x
 y_min = -1.0 # Minimum value of y 
@@ -82,6 +81,7 @@ solver = Wave_2D_Spectral.Wave_2D(Nx, x_min, x_max, tend, c, Lambda, aa , bb)
 
 #Solving and obtaining the solution. 
 x, y, t, u_sol = solver.solve() #solution shape -> t, x, y
+t, u_sol = t[::5], u_sol[::5]
 
 x = torch.tensor(x, dtype=torch.float32)
 y = torch.tensor(y, dtype=torch.float32)
@@ -99,7 +99,7 @@ u_out = u[...,configuration['T_in'] : configuration['T_in'] + configuration['T_o
 
 # %% 
 #Normalisation
-norms = np.load(model_loc + '/FNO_Wave_daring-salmon_norms.npz')
+norms = np.load(model_loc + '/FNO_Wave_charitable-sea_norms.npz')
 #Loading the Normaliation values
 in_normalizer = MinMax_Normalizer(u_in)
 in_normalizer.a = torch.tensor(norms['in_a'])
@@ -115,7 +115,7 @@ u_out_encoded = out_normalizer.encode(u_out)
 # %%
 #Load the model. 
 model = FNO_multi(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
-model.load_state_dict(torch.load(model_loc + '/FNO_Wave_daring-salmon.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
 
 #Model Predictions.
 pred_encoded, mse, mae = validation_AR(model, u_in, u_out_encoded, configuration['Step'], configuration['T_out'])
@@ -129,8 +129,8 @@ pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 # %% 
 #Estimating the Residuals ->  u_tt  = c**2 * (u_xx + u_yy)
 
-u_val = u_out[:, 0] #Validating on Numerical Solution 
-# u_val = pred[:, 0] #Prediction
+# u_val = u_out[:, 0] #Validating on Numerical Solution 
+u_val = pred[:, 0] #Prediction
 u_val = u_val.permute(0, 3, 1, 2) #BS, Nt, Nx, Nt
 
 dx = np.asarray(x[-1] - x[-2])
@@ -149,25 +149,28 @@ u_xx_yy = D_xx_yy(u_val)
 
 #Removing the Boundary Elements 
 if len(u_val)==1:
-    u_tt = u_tt#[1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy#[1:-1,1:-1,1:-1]
+    u_tt = u_tt[1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy[1:-1,1:-1,1:-1]
 else:
-    u_tt = u_tt#[:, 1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy#[:, 1:-1,1:-1,1:-1]
+    u_tt = u_tt[:, 1:-1,1:-1,1:-1]
+    u_xx_yy = u_xx_yy[:, 1:-1,1:-1,1:-1]
 
 #Residuals 
 u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
+
 
 # %% Additive Kernels 
 D = ConvOperator()
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 u_residual_additive = D(u_val)
 
+#Spectral convolutions 
+u_residual_sc = D.spectral_convolution(u_val)[0]
 # %% 
 # Example values to plot
 t_idx = 10
-values = [u_residual_additive[t_idx], u_residual[t_idx]]
-titles = ["Additive Kernels", "Individual Kernels"]
+values = [u_residual[t_idx], u_residual_additive[t_idx], u_residual_sc[t_idx]]
+titles = ["Individual Kernels", "Additive Kernels", "Spectral Convs"]
 
 subplots_2d(values, titles)
 
