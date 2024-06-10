@@ -78,7 +78,6 @@ def pad_kernel(grid, kernel):#Could go into the deriv conv class
     return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, ny-kernel_size, 0, nt-kernel_size), "constant", 0)
 
 
-
 class ConvOperator():
     """
     A class for performing convolutions as a derivative or integrative operation on a given domain.

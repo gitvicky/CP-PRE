@@ -74,7 +74,8 @@ bb = 0.75#parametrisation of initial Vx
 t_slice = 10 
 x_slice = 4
 
-from Neural_PDE.Numerical_Solvers.Navier_Stokes.NS_2D import Navier_Stokes_2d
+from Neural_PDE.Numerical_Solvers.Navier_Stokes.NS_2D_spectral import * 
+
 solver= Navier_Stokes_2d(N, tStart, tEnd, dt, nu, L, aa, bb)
 u, v, p, w, x, t, err = solver.solve()
 

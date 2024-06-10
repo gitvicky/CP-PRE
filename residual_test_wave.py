@@ -76,7 +76,7 @@ bb = 0.25 #Y-pos
 c = 1.0 #Wave Speed <=1.0
 
 #Initialising the Solver
-from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import Wave_2D
+from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import * 
 solver = Wave_2D(Nx, x_min, x_max, tend, c)
 x, y, t, u_sol = solver.solve(Lambda, aa, bb)
 
