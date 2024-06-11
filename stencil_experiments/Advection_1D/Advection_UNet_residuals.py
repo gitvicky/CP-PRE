@@ -30,11 +30,11 @@ configuration = {"Case": 'Advection',
                  "Loss Function": 'MSE',
                  }
 
-from simvue import Run
-run = Run(mode='disabled')
-run.init(folder="/Residual_UQ", tags=['Conformal Prediction', 'Advection', 'U-Net'], metadata=configuration)
-run_name = 'mean'
-print(run_name)
+# from simvue import Run
+# run = Run(mode='disabled')
+# run.init(folder="/Residual_UQ", tags=['Conformal Prediction', 'Advection', 'U-Net'], metadata=configuration)
+# run_name = 'mean'
+# print(run_name)
 
 # %%
 #Importing necessary packages. 
@@ -149,7 +149,7 @@ model = UNet1d(T_in, step, 32)
 # model = UNet1d_dropout(T_in, step, 32)
 model.to(device)
 model = model.float()
-run.update_metadata({'Number of Params': int(model.count_params())})
+# run.update_metadata({'Number of Params': int(model.count_params())})
 
 print("Number of model params : " + str(model.count_params()))
 
@@ -234,8 +234,8 @@ for ep in tqdm(range(epochs)):
     
     print('Epochs: %d, Time: %.2f, Train Loss per step: %.3e, Train Loss: %.3e, Test Loss per step: %.3e, Test Loss: %.3e' % (ep, t2 - t1, train_l2_step / ntrain / (T / step), train_loss, test_l2_step / ntest / (T / step), test_loss))
     
-    run.log_metrics({'Train Loss': train_loss, 
-                    'Test Loss': test_loss})
+    # run.log_metrics({'Train Loss': train_loss, 
+    #                 'Test Loss': test_loss})
     
 train_time = time.time() - start_time
 # %%
@@ -279,10 +279,10 @@ MAE_error = torch.abs(pred_set - test_u_encoded).mean()
 print('(MSE) Testing Error: %.3e' % (MSE_error))
 print('(MAE) Testing Error: %.3e' % (MAE_error))
 
-run.update_metadata({'Training Time': float(train_time),
-                     'MSE Test Error': float(MSE_error),
-                     'MAE Test Error': float(MAE_error)
-                    })
+# run.update_metadata({'Training Time': float(train_time),
+#                      'MSE Test Error': float(MSE_error),
+#                      'MAE Test Error': float(MAE_error)
+#                     })
 
 pred_set = y_normalizer.decode(pred_set.to(device)).cpu()
 

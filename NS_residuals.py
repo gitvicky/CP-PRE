@@ -147,8 +147,8 @@ def unstack_fields(field, axis, variable_names):
     
     return variables
 
-u, v, p, w = unstack_fields(pred, axis=1, variable_names=field)#Prediction
-# u, v, p, w = unstack_fields(u_out, axis=1, variable_names=field)#Solution
+# u, v, p, w = unstack_fields(pred, axis=1, variable_names=field)#Prediction
+u, v, p, w = unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
 dx = np.asarray(x[-1] - x[-2])
 dy = dx
@@ -156,22 +156,28 @@ dt = dt
 
 alpha = 1/dt*2
 beta = 1/dx*2
-gamma = 1/dx**2                                                                                                                                        
+gamma = 1/dx**2                 
+
+alpha, beta, gamma = 1,1,1
 
 from ConvOps import ConvOperator
 #Defining the required Convolutional Operations. 
-D_t = ConvOperator(domain='t', order=1, scale=alpha)
-D_x = ConvOperator(domain='x', order=1, scale=beta) 
-D_y = ConvOperator('y', 1, beta )
-D_x_y = ConvOperator(('x', 'y'), 1, beta)
-D_xx_yy = ConvOperator(('x','y'), 2, gamma)
+D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
+D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
+D_y = ConvOperator(domain='y', order=1)#, scale=beta)
+D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
+D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
 #Continuity
 residual_cont = D_x(u) + D_y(v) 
+residual_cont = D_x(u) + (dx/dy) * D_y(v) #Rescaling
 
 #Momentum
 residual_mom_x = D_t(u) + u*D_x(u) + v*D_y(u) - nu*D_xx_yy(u) + D_x(p)
+residual_mom_x = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy #Rescaling
+
 residual_mom_y = D_t(v) + u*D_y(v) + v*D_y(v) - nu*D_xx_yy(v) + D_y(p)
+residual_mom_y = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx #Rescaling
 
 # %% 
 # Example values to plot

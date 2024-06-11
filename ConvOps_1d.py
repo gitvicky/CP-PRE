@@ -57,25 +57,10 @@ def get_stencil(dims, deriv_order, taylor_order=2):
     raise ValueError("Invalid stencil parameters")
 
 
-#If the data is BS, Nt, Nx, Ny -- then the axis=0,1 will be for spatial derivs and axis=2 wil be for time. 
-def kernel_3d(stencil, axis):
-    kernel_size = stencil.shape[0]
-    kernel = torch.zeros(kernel_size, kernel_size, kernel_size)
-    if axis == 0:
-        kernel[1,:,:] = stencil
-    elif axis ==1:
-            kernel[:,1,:] = stencil
-    elif axis ==2:
-            kernel[:,:,1] = stencil
-    else:
-        raise ValueError("Invalid axis. Must be either 0, 1 or 2")
-    
-    return kernel
-
 def pad_kernel(grid, kernel):#Could go into the deriv conv class
     kernel_size = kernel.shape[0]
-    bs, nt, nx, ny = grid.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]
-    return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, ny-kernel_size, 0, nt-kernel_size), "constant", 0)
+    bs, nt, nx = grid.shape[0], grid.shape[1], grid.shape[2]
+    return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, nt-kernel_size), "constant", 0)
 
 
 class ConvOperator():
@@ -97,19 +82,15 @@ class ConvOperator():
             self.stencil = get_stencil(self.dims, self.order, taylor_order)
 
             if self.domain == 't':
-                self.axis = 2
+                self.stencil = self.stencil
             elif self.domain == 'x':
-                self.axis = 1
-            elif self.domain == 'y':
-                self.axis = 0
-            elif self.domain == ('x','y'):
-                self.axis = 0
-            elif self.domain == ('x', 'y', 't'):
-                self.axis = 0
+                self.stencil = self.stencil.T
+            elif self.domain == ('x','t'):
+                self.stencil = self.stencil
             else:
-                raise ValueError("Invalid Domain. Must be either x,y or t")
+                raise ValueError("Invalid Domain. Must be either x or t")
             
-            self.kernel = kernel_3d(self.stencil, self.axis)
+            self.kernel = self.stencil
             self.kernel = scale*self.kernel
         except:
             pass
@@ -128,7 +109,7 @@ class ConvOperator():
         if kernel != None: 
             self.kernel = kernel
 
-        return F.conv3d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2, self.kernel.shape[2]//2)).squeeze()
+        return F.conv2d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2)).squeeze()
     
 
     def spectral_convolution(self, field, kernel=None):
@@ -147,12 +128,13 @@ class ConvOperator():
         if kernel != None: 
             self.kernel = kernel
 
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x
         kernel_pad = pad_kernel(field, self.kernel)
+        print(kernel_pad.shape)
         kernel_fft = torch.fft.fftn(kernel_pad)
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x,y
 
-        return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2,3)).real
+        return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2)).real
 
 
     def integrate(self, field, kernel=None, eps=1e-6):
@@ -174,10 +156,10 @@ class ConvOperator():
             self.kernel = kernel
         
         kernel_pad = pad_kernel(field, self.kernel)
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x
         kernel_fft = torch.fft.fftn(kernel_pad)
         inv_kernel_fft = 1 / (kernel_fft + eps)
-        u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
+        u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2)).real
         return u_integrate
 
 

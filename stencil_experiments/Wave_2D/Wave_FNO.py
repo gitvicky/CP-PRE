@@ -219,7 +219,6 @@ epochs = configuration['Epochs']
 if torch.cuda.is_available():
     y_normalizer.cuda()
 
-
 # %%
 #Training Loop
 start_time = time.time()
@@ -297,7 +296,6 @@ for ep in range(epochs): #Training Loop - Epochwise
                    'Test Loss': test_loss})
 
 train_time = time.time() - start_time
-
 
 # %%
 

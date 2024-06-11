@@ -49,3 +49,42 @@ def subplots_2d(values, titles, flatten=False):
     
     # Display the plot
     plt.show()
+
+import matplotlib.pyplot as plt
+
+
+def subplots_1d(x_values, y_values, titles):
+    num_subplots = len(y_values)
+    
+    # Calculate the number of rows and columns for the subplots
+    num_rows = (num_subplots + 1) // 2
+    num_cols = 2
+    
+    # Create a figure and subplots
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 4 * num_rows))
+    
+    # Flatten the axes array for easier indexing
+    axes = axes.flatten()
+    
+    for i, (x, y, title) in enumerate(zip(x_values, y_values, titles)):
+        # Plot the values on the corresponding subplot
+        axes[i].plot(x, y[0], color='black')
+        axes[i].plot(x, y[1], color='blue')
+        
+        # Set the title and labels for the subplot
+        axes[i].set_title(title)
+        axes[i].set_xlabel('X')
+        axes[i].set_ylabel('Y')
+        
+        # Set the grid
+        axes[i].grid(True)
+    
+    # Remove any unused subplots
+    for i in range(num_subplots, len(axes)):
+        fig.delaxes(axes[i])
+    
+    # Adjust the spacing between subplots
+    plt.tight_layout()
+    
+    # Display the plot
+    plt.show()

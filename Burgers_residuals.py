@@ -76,6 +76,8 @@ nu = 0.002
 x_slice = 5
 t_slice = 10
 
+x_slice, t_slice = 1, 1
+
 alpha, beta, gamma = 1.0, 1.0, 1.0
 
 sim = Burgers_1D(Nx, Nt, x_min, x_max, t_end, nu) 
@@ -127,44 +129,44 @@ pred = pred_encoded
 # %% 
 #Estimating the Residuals
 
-uu = pred #Prediction
+# uu = pred #Prediction
 uu = u_out #Solution
+uu = uu.permute(0,1,3,2)
+uu = uu[:, 0]
 
-dx = np.asarray(x[-1] - x[-2])
+dx = x[-1] - x[-2]
 dt = dt
 
 alpha = 1/dt*2
 beta = 1/dx*2
-gamma = 1/dx**2                                                                                                                                        
+gamma = 1/dx**2     
 
-from ConvOps import ConvOperator
+from ConvOps_1d import ConvOperator
 #Defining the required Convolutional Operations. 
-D_t = ConvOperator(domain='t', order=1, scale=alpha)
-D_x = ConvOperator(domain='x', order=1, scale=beta) 
-D_xx = ConvOperator(domain='x', order=2, scale=gamma)
+D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
+D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
+D_xx = ConvOperator(domain='x', order=2)#, scale=gamma)
 
 # Residual
-residual_cont = D_t(uu) + uu * D_x(uu) - nu * D_xx(uu)
+residual  = dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
+residual = residual[...,1:-1, 1:-1]
 
 
-# # %% 
-# # Example values to plot
-# t_idx = -1
-# values = [residual_cont[t_idx][1:-1,1:-1], residual_mom_x[0, t_idx][1:-1,1:-1], residual_mom_y[0, t_idx][1:-1,1:-1]]
-# titles = ["Cont.", "Mom_X", "Mom_Y"]
+# %% 
+from plot_tools import subplots_2d
+values = [residual[0]]
+titles = ["Residual"]
 
-# subplots_2d(values, titles)
+subplots_2d(values, titles)
 
-# # %%
+# %%
 # #############################################################################
 # #Performing the Inverse mapping from the Residuals to the Fields
 # #############################################################################
 
-# # u_integrate = D.integrate(u_val)
+# u_integrate = D.integrate(uu)
 
-# # values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
-# # titles = ['Actual', 'Retrieved', 'Abs Diff']
-# # subplots_2d(values, titles)
-# # %% 
-
-# %%
+# values=[uu[0], u_integrate[0]]
+# titles = ['Actual', 'Retrieved']
+# subplots_2d(values, titles)
+# # # %% 
