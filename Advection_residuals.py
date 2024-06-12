@@ -11,7 +11,7 @@ Desc.
 configuration = {"Case": 'Advection',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 0,
+                 "Epochs": 500,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.001,
@@ -27,7 +27,7 @@ configuration = {"Case": 'Advection',
                  "Variables":1, 
                  "Noise":0.0, 
                  "Loss Function": 'MSE',
-                 "Number_Sims": 10
+                 "Number_Sims": 100
                  }
 
 
@@ -240,6 +240,14 @@ pred, mse, mae = validation_AR(model, u_in, u_out, configuration['Step'], config
 print('(MSE) Error: %.3e' % (mse))
 print('(MAE) Error: %.3e' % (mae))
 
+from plot_tools import subplots_1d
+x = x
+values = {"Numerical": u_out[0,0].T, 
+          "Prediction": pred[0,0].T
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x, values, indices, "Comparing Model Prediction")
+
 # %% 
 #Estimating the Residuals
 
@@ -271,10 +279,6 @@ D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
 residual = D(uu)
 residual = residual[...,1:-1, 1:-1]
 
-#Residual - Spectral Convolution 
-residual = D.spectral_convolution(uu)
-residual = residual[0][5:-1,1:-1]
-
 # %% 
 from plot_tools import subplots_2d
 values = [residual]
@@ -282,16 +286,68 @@ titles = ["Residual"]
 
 subplots_2d(values, titles)
 
-# # %%
-# #############################################################################
-# #Performing the Inverse mapping from the Residuals to the Fields
-# #############################################################################
+# %%
+#############################################################################
+#Performing the Inverse mapping from the Residuals to the Fields
+#############################################################################
 
 u_integrate = D.integrate(uu)
 
 values=[uu[0], u_integrate[0]]
 titles = ['Actual', 'Retrieved']
 subplots_2d(values, titles)
-# # %% 
 
+
+from plot_tools import subplots_1d
+x = x
+values = {"Actual": uu[0], 
+          "Retrieved": u_integrate[0]
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x, values, indices, "Comparing Integration")
+
+# %%
+#############################################################################
+# Further Comparative Studies
+#############################################################################
+
+
+#Comparing residuals across the prediction and comparison
+u_num = u_out.permute(0,1,3,2)[:,0]
+u_pred = pred.permute(0,1,3,2)[:,0]
+
+residual_numerical = D_t(u_num) + (v*dt/dx) * D_x(u_num) 
+residual_predicition =  D_t(u_pred) + (v*dt/dx) * D_x(u_pred) 
+
+
+x_values = x[1:-1]
+y_values = {"Numerical": residual_numerical[:, 1:-1], 
+          "Prediction": residual_predicition[:, 1:-1]
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x_values, y_values, indices, "Comparing Residauals")
+
+# %%
+#Performing the Integration by Parts without using the additive kernels
+
+# #u = - (x.u_t + v.t.u_x) / (1+v)
+# xx = torch.tensor(x).unsqueeze(0).tile(30,1)
+# tt = torch.tensor(t[T_in:]).unsqueeze(0).tile(200,1).T
+
+# u_int_parts = - (xx*D_t(uu) + v*tt*D_x(uu)) / (1+v)
+
+u_int_parts = ( D_t.integrate(uu) + v*D_x.integrate(uu) ) / 2
+
+values=[uu[0], u_integrate[0], u_int_parts]
+titles = ['Actual', 'Retrieved', 'Ret. Parts']
+subplots_2d(values, titles)
+
+from plot_tools import subplots_1d
+x_values = x
+values = {"Actual": uu[0], 
+          "Retrieved": u_integrate[0],
+          "Ret. Parts": u_int_parts
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x_values, values, indices, "Comparing Integrations")
 # %%

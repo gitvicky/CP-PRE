@@ -53,8 +53,10 @@ def subplots_2d(values, titles, flatten=False):
 import matplotlib.pyplot as plt
 
 
-def subplots_1d(x_values, y_values, titles):
-    num_subplots = len(y_values)
+def subplots_1d(x_values, y_values, indices, title=None):
+    num_subplots = len(indices)
+    num_vars = len(y_values)
+    colors = ['black', 'blue', 'green', 'red']
     
     # Calculate the number of rows and columns for the subplots
     num_rows = (num_subplots + 1) // 2
@@ -62,27 +64,35 @@ def subplots_1d(x_values, y_values, titles):
     
     # Create a figure and subplots
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 4 * num_rows))
-    
+   
+    # Set the overall plot title
+    if title is not None:
+        plt.suptitle(title)
+
     # Flatten the axes array for easier indexing
     axes = axes.flatten()
     
-    for i, (x, y, title) in enumerate(zip(x_values, y_values, titles)):
+    for ii, idx in enumerate(indices): 
         # Plot the values on the corresponding subplot
-        axes[i].plot(x, y[0], color='black')
-        axes[i].plot(x, y[1], color='blue')
-        
+        for var in range(num_vars):
+            axes[ii].plot(x_values, y_values[list(y_values.keys())[var]][idx],
+                        color=colors[var], label=list(y_values.keys())[var])
+        # axes[ii].plot(x_values, y_values[list(y_values.keys())[1]][idx], 
+        #               color='blue', label=list(y_values.keys())[1])        
         # Set the title and labels for the subplot
-        axes[i].set_title(title)
-        axes[i].set_xlabel('X')
-        axes[i].set_ylabel('Y')
+        axes[ii].set_title("t = " + str(idx))
+        axes[ii].set_xlabel('X')
+        axes[ii].set_ylabel('Y')
+        axes[ii].legend()
         
         # Set the grid
-        axes[i].grid(True)
+        axes[ii].grid(True)
     
     # Remove any unused subplots
     for i in range(num_subplots, len(axes)):
         fig.delaxes(axes[i])
     
+
     # Adjust the spacing between subplots
     plt.tight_layout()
     

@@ -99,9 +99,9 @@ class ConvOperator():
             if self.domain == 't':
                 self.axis = 2
             elif self.domain == 'x':
-                self.axis = 1
-            elif self.domain == 'y':
                 self.axis = 0
+            elif self.domain == 'y':
+                self.axis = 1
             elif self.domain == ('x','y'):
                 self.axis = 0
             elif self.domain == ('x', 'y', 't'):

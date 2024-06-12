@@ -126,6 +126,14 @@ print('(MAE) Error: %.3e' % (mae))
 #Denormalising the predictions
 # pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 pred = pred_encoded
+
+from plot_tools import subplots_1d
+x = x
+values = {"Numerical": u_out[0,0].T, 
+          "Prediction": pred[0,0].T
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x, values, indices, "Comparing Model Prediction")
 # %% 
 #Estimating the Residuals
 
@@ -151,13 +159,12 @@ D_xx = ConvOperator(domain='x', order=2)#, scale=gamma)
 residual  = dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
 residual = residual[...,1:-1, 1:-1]
 
+x_values = x[1:-1]
+y_values = {"Prediction": residual[0]
+          }
+indices = [6, 12, 18, 24]
+subplots_1d(x_values, y_values, indices, "Residuals")
 
-# %% 
-from plot_tools import subplots_2d
-values = [residual[0]]
-titles = ["Residual"]
-
-subplots_2d(values, titles)
 
 # %%
 # #############################################################################

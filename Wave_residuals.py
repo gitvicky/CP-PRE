@@ -141,8 +141,8 @@ beta = 1/dt**2
 
 from ConvOps import ConvOperator
 #Defining the required Convolutional Operations. 
-D_tt = ConvOperator('t', 2)
-D_xx_yy = ConvOperator(('x','y'), 2)
+D_tt = ConvOperator('t', 2)#, scale=alpha)
+D_xx_yy = ConvOperator(('x','y'), 2)#, scale=beta)
 u_tt = D_tt(u_val)
 u_xx_yy = D_xx_yy(u_val)
 
@@ -193,13 +193,13 @@ subplots_2d(values, titles, flatten=True)
 
 values = [u_out[0, 0,...,t_idx],
           pred[0,0,...,t_idx],
-          abs(pred[0,0,...,t_idx] - u_out[0,0,...,t_idx]),
+          pred[0,0,...,t_idx] - u_out[0,0,...,t_idx],
           u_residual[t_idx]
           ]
 
 titles = [r'$u$',
           r'$\tilde u$',
-          r'$|u - \tilde u|$',
+          r'$u - \tilde u$',
           r'$ \frac{\partial^2 \tilde u}{\partial t^2 } - c^2 (\frac{\partial^2 \tilde u}{\partial x^2} + \frac{\partial^2 \tilde u}{\partial y^2})$'
           ]
 
