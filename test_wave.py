@@ -148,11 +148,11 @@ u_xx_yy = D_xx_yy(u_val)
 
 #Removing the Boundary Elements 
 if len(u_val)==1:
-    u_tt = u_tt[1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy[1:-1,1:-1,1:-1]
+    u_tt = u_tt
+    u_xx_yy = u_xx_yy
 else:
-    u_tt = u_tt[:, 1:-1,1:-1,1:-1]
-    u_xx_yy = u_xx_yy[:, 1:-1,1:-1,1:-1]
+    u_tt = u_tt
+    u_xx_yy = u_xx_yy
 
 #Residuals 
 u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
@@ -161,13 +161,13 @@ u_residual = u_tt - (c*dt/dx)**2 * u_xx_yy
 # %% Additive Kernels 
 D = ConvOperator()
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
-u_residual_additive = D(u_val)[1:-1,1:-1,1:-1]
+u_residual_additive = D(u_val)
 
 #Spectral convolutions 
-u_residual_sc = D.spectral_convolution(u_val)[0][1:-1,1:-1,1:-1]
+u_residual_sc = D.spectral_convolution(u_val)[0]
 # %% 
 # Example values to plot
-t_idx = 10
+t_idx = 1
 values = [u_residual[t_idx], u_residual_additive[t_idx], u_residual_sc[t_idx]]
 titles = ["Individual Kernels", "Additive Kernels", "Spectral Convs"]
 

@@ -111,8 +111,8 @@ in_normalizer.a = torch.tensor(norms['in_a'])
 in_normalizer.b = torch.tensor(norms['in_b'])
 
 out_normalizer = MinMax_Normalizer(u_out)
-out_normalizer.a = torch.tensor(norms['in_a'])
-out_normalizer.b = torch.tensor(norms['in_b'])
+out_normalizer.a = torch.tensor(norms['out_a'])
+out_normalizer.b = torch.tensor(norms['out_b'])
 
 u_in = in_normalizer.encode(u_in)
 u_out_encoded = out_normalizer.encode(u_out)
@@ -187,14 +187,4 @@ titles = ["Cont.", "Mom_X", "Mom_Y"]
 
 subplots_2d(values, titles)
 
-# %%
-#############################################################################
-#Performing the Inverse mapping from the Residuals to the Fields
-#############################################################################
-
-# u_integrate = D.integrate(u_val)
-
-# values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
-# titles = ['Actual', 'Retrieved', 'Abs Diff']
-# subplots_2d(values, titles)
 # %% 

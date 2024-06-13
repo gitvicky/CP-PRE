@@ -4,7 +4,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 
 
-def subplots_2d(values, titles, title=None, flatten=False):
+def subplots_2d(values, titles, main_title=None, flatten=False):
     num_subplots = len(values)
     
     # Calculate the number of rows and columns for the subplots
@@ -42,7 +42,7 @@ def subplots_2d(values, titles, title=None, flatten=False):
 
     # Set the overall plot title
     if title is not None:
-        plt.suptitle(title)
+        plt.suptitle(main_title)
 
     # Remove any unused subplots
     for i in range(num_subplots, len(axes)):
