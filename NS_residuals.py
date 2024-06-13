@@ -104,7 +104,7 @@ u_out = vars[...,configuration['T_in'] : configuration['T_in'] + configuration['
 
 # %% 
 #Normalisation
-norms = np.load(model_loc + '/FNO_Navier-Stokes_partial-crumble_norms.npz')
+norms = np.load(model_loc + '/FNO_Navier-Stokes_warm-dialogue_norms.npz')
 #Loading the Normaliation values
 in_normalizer = MinMax_Normalizer(u_in)
 in_normalizer.a = torch.tensor(norms['in_a'])
@@ -120,7 +120,7 @@ u_out_encoded = out_normalizer.encode(u_out)
 # %%
 #Load the model. 
 model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
-model.load_state_dict(torch.load(model_loc + '/FNO_Navier-Stokes_partial-crumble.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_Navier-Stokes_warm-dialogue.pth', map_location='cpu'))
 
 #Model Predictions.
 pred_encoded, mse, mae = validation_AR(model, u_in, u_out_encoded, configuration['Step'], configuration['T_out'])

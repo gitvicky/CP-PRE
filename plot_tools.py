@@ -4,7 +4,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
 
 
-def subplots_2d(values, titles, flatten=False):
+def subplots_2d(values, titles, title=None, flatten=False):
     num_subplots = len(values)
     
     # Calculate the number of rows and columns for the subplots
@@ -25,7 +25,7 @@ def subplots_2d(values, titles, flatten=False):
     
     for i, (value, title) in enumerate(zip(values, titles)):
         # Plot the value using imshow on the corresponding subplot
-        im = axes[i].imshow(value, cmap='jet')
+        im = axes[i].imshow(value, cmap='magma')
         
         # Set the title for the subplot
         axes[i].set_title(title)
@@ -40,6 +40,10 @@ def subplots_2d(values, titles, flatten=False):
         cbar = fig.colorbar(im, cax=cax)
         axes[i].tick_params(which='both', labelbottom=False, labelleft=False, left=False, bottom=False)
 
+    # Set the overall plot title
+    if title is not None:
+        plt.suptitle(title)
+
     # Remove any unused subplots
     for i in range(num_subplots, len(axes)):
         fig.delaxes(axes[i])
@@ -50,7 +54,6 @@ def subplots_2d(values, titles, flatten=False):
     # Display the plot
     plt.show()
 
-import matplotlib.pyplot as plt
 
 
 def subplots_1d(x_values, y_values, indices, title=None):
