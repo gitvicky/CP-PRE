@@ -32,8 +32,8 @@ configuration = {"Case": 'Wave',
                  "Variables":1, 
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
-                 "n_cal": 1000,
-                 "n_pred": 1000
+                 "n_cal": 100,
+                 "n_pred": 10
                  }
 
 # %% 
@@ -146,7 +146,7 @@ pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 # uu = u_out[:, 0] #Validating on Numerical Solution 
 uu = pred[:, 0] #Prediction
 uu = uu.permute(0, 3, 1, 2) #BS, Nt, Nx, Ny
-
+uu_cal = uu
 dx = np.asarray(x[-1] - x[-2])
 dy = np.asarray(y[-1] - y[-2])
 dt = t[-1] - t[-2]
@@ -162,8 +162,7 @@ D_xx_yy = ConvOperator(('x','y'), 2)#, scale=beta)
 # %% Additive Kernels 
 D = ConvOperator()
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
-u_residual = D(uu)#[:, 1:-1,1:-1,1:-1] #Need to fix this padding. 
-
+cal_residual = D(uu)#[:, 1:-1,1:-1,1:-1] #Need to fix this padding. 
 
 # %%
 #Plotting the fields, prediction, abs error and the residual
@@ -172,7 +171,7 @@ t_idx = 10
 values = [u_out[0, 0,...,t_idx],
           pred[0,0,...,t_idx],
           pred[0,0,...,t_idx] - u_out[0,0,...,t_idx],
-          u_residual[idx, t_idx]
+          cal_residual[idx, t_idx]
           ]
 
 titles = [r'$u$',
@@ -189,11 +188,11 @@ idx = 0
 t_idx = [10, 20, 30]
 values = [
           pred[0,0,...,t_idx[0]] - u_out[0,0,...,t_idx[0]],
-          u_residual[idx, t_idx[0]],
+          cal_residual[idx, t_idx[0]],
           pred[0,0,...,t_idx[1]] - u_out[0,0,...,t_idx[1]],
-          u_residual[idx, t_idx[1]],
+          cal_residual[idx, t_idx[1]],
           pred[0,0,...,t_idx[2]] - u_out[0,0,...,t_idx[2]],
-          u_residual[idx, t_idx[2]],
+          cal_residual[idx, t_idx[2]],
           ]
 
 titles = ['Err: t=' + str(t_idx[0]),
@@ -210,24 +209,14 @@ subplots_2d(values, titles, )
 #Generating Predictions 
 n_pred = configuration['n_pred'] #Calibration dataset
 
-Nx = 64 # Mesh Discretesiation 
-x_min = -1.0 # Minimum value of x
-x_max = 1.0 # maximum value of x
-y_min = -1.0 # Minimum value of y 
-y_max = 1.0 # Minimum value of y
-tend = 1
-c = 1.0 #Wave Speed <=1.0
-    
 #Initial Condition Parameterisations: amplitude, x and y positions of the initial gaussian. 
-lb = np.asarray([20, 0.20, 0.20]) #amp, xx_pos, y_pos
-ub = np.asarray([40, 0.30, 0.30]) 
-params = lb + (ub-lb)*lhs(3, n_cal)
+lb = np.asarray([20, -0.50, -0.50]) #amp, xx_pos, y_pos
+ub = np.asarray([40, 0.50, 0.50]) 
+params = lb + (ub-lb)*lhs(3, n_pred)
 
-#Initialising the Solver
-from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import * 
 u_sol = []
 solver = Wave_2D(Nx, x_min, x_max, tend, c)
-for ii in tqdm(range(n_cal)):
+for ii in tqdm(range(n_pred)):
     x, y, t, uu = solver.solve(params[ii,0], params[ii,1], params[ii,2])
     u_sol.append(uu[::5])
     t = t[::5]
@@ -243,7 +232,6 @@ u = u.unsqueeze(1)#BS, vars, Nx, Ny, Nt
 u_in = u[...,:configuration['T_in']]
 u_out = u[...,configuration['T_in'] : configuration['T_in'] + configuration['T_out']]
 
-# %% 
 #Normalisation
 u_in = in_normalizer.encode(u_in)
 u_out_encoded = out_normalizer.encode(u_out)
@@ -256,30 +244,39 @@ print('(MAE) Error: %.3e' % (mae))
 
 #Denormalising the predictions
 pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
+
+# %% 
+#Obtaining the residuals for the predictions.
 uu = pred[:,0]
-u_residual = D(uu)
+uu = uu.permute(0, 3, 1, 2) #BS, Nt, Nx, Ny
+uu_pred = uu
+pred_residual = D(uu)
 # %% 
 #Performing CP over the residual space
 from Neural_PDE.UQ.inductive_cp import * 
-ncf_scores = u_residual
+ncf_scores = np.abs(cal_residual.numpy()) #/ (uu_cal.numpy() + 1e-6)
 alpha = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [np.zeros(u_residual.shape) - qhat, np.zeros(u_residual.shape) + qhat]
-empirical_coverage = emp_cov(prediction_sets, np.zeros(u_residual.shape))
-print(f"The empirical coverage after calibration is: {empirical_coverage}")
+prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+#Input Dependent
+# prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()]
 
-#Checking for Coverage across various alpha levels 
-alpha_levels = np.arange(0.05, 0.95, 0.1)
-empirical_coverage = []
-for alpha in alpha_levels:
-    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [np.zeros(u_residual.shape) - qhat, np.zeros(u_residual.shape) + qhat]
-    empirical_coverage.append(emp_cov(prediction_sets, np.zeros(u_residual.shape)))
+# %%
+# Plotting the Residual and the qhat 
+idx = 5
+t_idx = 20
+values = [
+          uu_pred[idx,t_idx],
+          pred_residual[idx,t_idx],
+          prediction_sets[0][idx, t_idx],
+          prediction_sets[1][idx, t_idx]
+          ]
 
-#Plotting Coverage
-import matplotlib as mpl
-plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.75)
-plt.plot(1-alpha_levels, empirical_coverage, label='Residual' ,ls='-.', color='teal', alpha=0.75)
-plt.xlabel(r'1-$\alpha$')
-plt.ylabel('Empirical Coverage')
+titles = ['Prediction: t=' + str(t_idx),
+          'Residual: t=' + str(t_idx),
+          'Lower Bar: t=' + str(t_idx),
+          'Upper Bar: t=' + str(t_idx)
+          ]
+
+subplots_2d(values, titles, "Conformal Prediction")
 # %%
