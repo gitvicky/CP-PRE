@@ -33,7 +33,7 @@ configuration = {"Case": 'Wave',
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
                  "n_cal": 100,
-                 "n_pred": 10
+                 "n_pred": 100
                  }
 
 # %% 
@@ -207,7 +207,7 @@ subplots_2d(values, titles, )
 
 # %% 
 #Generating Predictions 
-n_pred = configuration['n_pred'] #Calibration dataset
+n_pred = configuration['n_pred'] #Prediction Dataset
 
 #Initial Condition Parameterisations: amplitude, x and y positions of the initial gaussian. 
 lb = np.asarray([20, -0.50, -0.50]) #amp, xx_pos, y_pos
@@ -279,4 +279,28 @@ titles = ['Prediction: t=' + str(t_idx),
           ]
 
 subplots_2d(values, titles, "Conformal Prediction")
+
+# %% 
+# #Checking for coverage:
+#Obtaining the residuals for the Numerical Solution. 
+uu = u_out[:,0]
+uu = uu.permute(0, 3, 1, 2) #BS, Nt, Nx, Ny
+uu_pred = uu
+val_residual = D(uu)
+
+
+#Emprical Coverage for all values of alpha 
+alpha_levels = np.arange(0.05, 0.95, 0.1)
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
 # %%
