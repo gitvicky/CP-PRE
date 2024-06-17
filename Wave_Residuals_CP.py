@@ -210,8 +210,8 @@ subplots_2d(values, titles, )
 n_pred = configuration['n_pred'] #Prediction Dataset
 
 #Initial Condition Parameterisations: amplitude, x and y positions of the initial gaussian. 
-lb = np.asarray([20, -0.50, -0.50]) #amp, xx_pos, y_pos
-ub = np.asarray([40, 0.50, 0.50]) 
+# lb = np.asarray([20, -0.50, -0.50]) #amp, xx_pos, y_pos
+# ub = np.asarray([40, 0.50, 0.50]) 
 params = lb + (ub-lb)*lhs(3, n_pred)
 
 u_sol = []
@@ -254,16 +254,19 @@ pred_residual = D(uu)
 # %% 
 #Performing CP over the residual space
 from Neural_PDE.UQ.inductive_cp import * 
-ncf_scores = np.abs(cal_residual.numpy()) #/ (uu_cal.numpy() + 1e-6)
+ncf_scores = np.abs(cal_residual.numpy())# / (uu_cal.numpy() + 1e-6) #MINE
+# ncf_scores = np.abs(cal_residual.numpy()) / (np.std(uu_cal.numpy(), axis= 0) + 1e-6) #NICP
 alpha = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
-#Input Dependent
+prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat] 
+#Input Dependent- MINE 
 # prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()]
+# #NICP 
+# prediction_sets = [pred_residual.numpy() - qhat*np.std(uu_pred.numpy(), axis=0), pred_residual.numpy() + qhat*np.std(uu_pred.numpy(), axis=0)]
 
 # %%
 # Plotting the Residual and the qhat 
-idx = 5
+idx = 9
 t_idx = 20
 values = [
           uu_pred[idx,t_idx],
@@ -285,9 +288,7 @@ subplots_2d(values, titles, "Conformal Prediction")
 #Obtaining the residuals for the Numerical Solution. 
 uu = u_out[:,0]
 uu = uu.permute(0, 3, 1, 2) #BS, Nt, Nx, Ny
-uu_pred = uu
 val_residual = D(uu)
-
 
 #Emprical Coverage for all values of alpha 
 alpha_levels = np.arange(0.05, 0.95, 0.1)
@@ -295,6 +296,7 @@ emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
     prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    # prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()] #MINE
     emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
@@ -303,4 +305,27 @@ plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', a
 plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
+# %%
+#Inverting the Bounds 
+u_lower = D.integrate(torch.tensor(prediction_sets[0]))
+u_upper = D.integrate(torch.tensor(prediction_sets[1]))
+
+ # Plotting the Residual and the qhat 
+idx = 9
+t_idx = 20
+values = [
+          u_out[idx, 0, :, :, t_idx],
+          uu_pred[idx, t_idx],
+          u_lower[idx, :, :, t_idx],
+          u_upper[idx, :, :, t_idx]
+          ]
+
+titles = ['Solution: t=' + str(t_idx),
+          'Prediction: t=' + str(t_idx),
+          'Lower Bar: t=' + str(t_idx),
+          'Upper Bar: t=' + str(t_idx)
+          ]
+
+subplots_2d(values, titles, "Inverted Bounds")
+
 # %%

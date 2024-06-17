@@ -297,10 +297,17 @@ def verify_FD_Matrix_Mul():
 #Performing the Inverse mapping from the Residuals to the Fields
 #############################################################################
 
-u_integrate = D.integrate(u_val)
+u_diff_integrate = D.diff_integrate(u_val)
+
+values=[u_val[0, t_idx], u_diff_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_diff_integrate[0, t_idx])]
+titles = ['Actual', 'Retrieved', 'Abs Diff']
+subplots_2d(values, titles)
+
+
+# %%
+u_integrate = D.integrate(u_residual_sc.unsqueeze(0))
 
 values=[u_val[0, t_idx], u_integrate[0, t_idx], torch.abs(u_val[0, t_idx] - u_integrate[0, t_idx])]
 titles = ['Actual', 'Retrieved', 'Abs Diff']
 subplots_2d(values, titles)
-
 # %%

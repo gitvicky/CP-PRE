@@ -155,7 +155,7 @@ class ConvOperator():
         return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2,3)).real
 
 
-    def integrate(self, field, kernel=None, eps=1e-6):
+    def diff_integrate(self, field, kernel=None, eps=1e-6):
 
         """
         Performs Integration using the convolution theorem 3D derivative convolution.
@@ -178,6 +178,31 @@ class ConvOperator():
         kernel_fft = torch.fft.fftn(kernel_pad)
         inv_kernel_fft = 1 / (kernel_fft + eps)
         u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
+        return u_integrate
+
+    def integrate(self, field, kernel=None, eps=1e-6):
+
+        """
+        Performs Integration using the convolution theorem 3D derivative convolution.
+        
+        f * g * h = f  ; h =  1 / (g+eps)
+        
+        Args:
+            field (torch.Tensor): The input field tensor.
+            kernel (torch.Tensor): The convolution kernel tensor.
+            eps (float): Avoiding NaNs
+        Returns:
+            torch.Tensor: The result of the 3D Integration Operation. 
+        """
+        
+        if kernel != None: 
+            self.kernel = kernel
+        
+        kernel_pad = pad_kernel(field, self.kernel)
+        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        kernel_fft = torch.fft.fftn(kernel_pad)
+        inv_kernel_fft = 1 / (kernel_fft + eps)
+        u_integrate = torch.fft.ifftn(field_fft * inv_kernel_fft, dim=(1,2,3)).real
         return u_integrate
 
 

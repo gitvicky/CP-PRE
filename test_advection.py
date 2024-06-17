@@ -291,9 +291,9 @@ subplots_2d(values, titles)
 #Performing the Inverse mapping from the Residuals to the Fields
 #############################################################################
 
-u_integrate = D.integrate(uu)
+u_diff_integrate = D.diff_integrate(uu)
 
-values=[uu[0], u_integrate[0]]
+values=[uu[0], u_diff_integrate[0]]
 titles = ['Actual', 'Retrieved']
 subplots_2d(values, titles)
 
@@ -301,7 +301,7 @@ subplots_2d(values, titles)
 from plot_tools import subplots_1d
 x = x
 values = {"Actual": uu[0], 
-          "Retrieved": u_integrate[0]
+          "Retrieved": u_diff_integrate[0]
           }
 indices = [6, 12, 18, 24]
 subplots_1d(x, values, indices, "Comparing Integration")
@@ -325,7 +325,7 @@ y_values = {"Numerical": residual_numerical[:, 1:-1],
           "Prediction": residual_predicition[:, 1:-1]
           }
 indices = [6, 12, 18, 24]
-subplots_1d(x_values, y_values, indices, "Comparing Residauals")
+subplots_1d(x_values, y_values, indices, "Comparing Residuals")
 
 # %%
 #Performing the Integration by Parts without using the additive kernels
@@ -336,16 +336,16 @@ subplots_1d(x_values, y_values, indices, "Comparing Residauals")
 
 # u_int_parts = - (xx*D_t(uu) + v*tt*D_x(uu)) / (1+v)
 
-u_int_parts = ( D_t.integrate(uu) + v*D_x.integrate(uu) ) / 2
+u_int_parts = ( D_t.diff_integrate(uu) + v*D_x.diff_integrate(uu) ) / 2
 
-values=[uu[0], u_integrate[0], u_int_parts]
+values=[uu[0], u_diff_integrate[0], u_int_parts]
 titles = ['Actual', 'Retrieved', 'Ret. Parts']
 subplots_2d(values, titles)
 
 from plot_tools import subplots_1d
 x_values = x
 values = {"Actual": uu[0], 
-          "Retrieved": u_integrate[0],
+          "Retrieved": u_diff_integrate[0],
           "Ret. Parts": u_int_parts
           }
 indices = [6, 12, 18, 24]

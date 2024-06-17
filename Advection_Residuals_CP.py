@@ -30,7 +30,7 @@ configuration = {"Case": 'Advection',
                  "Loss Function": 'MSE',
                  "n_train": 100,
                  "n_cal": 100,
-                 "n_pred": 10
+                 "n_pred": 100
                  }
 
 #Importing the necessary packages
@@ -309,6 +309,29 @@ values = {"Residual": pred_residual[idx][1:-1, 1:-1],
           }
 
 indices = [6, 12, 18, 24]
-subplots_1d(x_values, values, indices, "CP within the residual space. Comparing Integrations")
+subplots_1d(x_values, values, indices, "CP within the residual space.")
 
 # %%
+#Checking for coverage:
+#Obtaining the residuals for the Numerical Solution. 
+uu = u_out
+uu = uu.permute(0,1,3,2)
+uu = uu[:,0]
+val_residual = D(uu)
+
+#Emprical Coverage for all values of alpha 
+alpha_levels = np.arange(0.05, 0.95, 0.1)
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+
+# %% 
