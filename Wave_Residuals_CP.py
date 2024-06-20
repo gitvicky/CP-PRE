@@ -7,7 +7,6 @@ Equation : u_tt = c**2 * (u_xx + u_yy)
 Surrogate Model : FNO
 Numerical Solver : https://github.com/gitvicky/Neural_PDE/blob/main/Numerical_Solvers/Wave/Wave_2D_Spectral.py
 
-
 """
 
 # %%
@@ -311,13 +310,13 @@ u_lower = D.integrate(torch.tensor(prediction_sets[0]))
 u_upper = D.integrate(torch.tensor(prediction_sets[1]))
 
  # Plotting the Residual and the qhat 
-idx = 9
-t_idx = 20
+idx = 0
+t_idx = 10
 values = [
           u_out[idx, 0, :, :, t_idx],
           uu_pred[idx, t_idx],
-          u_lower[idx, :, :, t_idx],
-          u_upper[idx, :, :, t_idx]
+          u_lower[idx, t_idx],
+          u_upper[idx, t_idx]
           ]
 
 titles = ['Solution: t=' + str(t_idx),

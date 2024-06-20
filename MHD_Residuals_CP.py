@@ -126,7 +126,6 @@ print('Calibration (MAE) Error: %.3e' % (mae))
 pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 
 # %% 
-#Estimating the Residuals
 
 def unstack_fields(field, axis, variable_names):
     fields = torch.split(field, 1, dim=axis)
@@ -141,8 +140,11 @@ def unstack_fields(field, axis, variable_names):
     
     return variables
 
-rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
-# rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
+# rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
+rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
+
+# %% 
+#Estimating the Residuals
 
 dx = np.asarray(x[-1] - x[-2])
 dy = dx
@@ -163,7 +165,11 @@ D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
 D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
 # Residual Estimation
+#Continuity 
+cont_cal = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
 
+#Gauss Law 
+gauss_cal = D_x(Bx) + D_y(By)
 # %% 
 # Example values to plot
 idx = 0
@@ -200,31 +206,41 @@ rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Predic
 # rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
 # Residual Estimation
+#Continuity 
+cont_pred = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
+
+#Gauss Law 
+gauss_pred = D_x(Bx) + D_y(By)
 
 # %% 
 #Performing CP over the residual space
 from Neural_PDE.UQ.inductive_cp import * 
-ncf_scores = np.abs(residual_cont_cal.numpy())# / (uu_cal.numpy() + 1e-6) #MINE
+ncf_scores = np.abs(cont_cal.numpy())# / (uu_cal.numpy() + 1e-6) #MINE
 
 alpha = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [residual_cont_pred.numpy() - qhat, residual_cont_pred.numpy() + qhat] 
+prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat] 
 
 # %% 
 # #Checking for coverage:
 #Obtaining the residuals for the Numerical Solution. 
-u, v, p, w = unstack_fields(u_out, axis=1, variable_names=field)#Solution
+rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
-#Residual Estimation 
+# Residual Estimation
+#Continuity 
+cont_val = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
+
+#Gauss Law 
+gauss_val = D_x(Bx) + D_y(By)
 
 #Emprical Coverage for all values of alpha 
 alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [residual_cont_pred.numpy() - qhat, residual_cont_pred.numpy() + qhat]
+    prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat]
     # prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()] #MINE
-    emp_cov_res.append(emp_cov(prediction_sets, residual_cont_val.numpy()))
+    emp_cov_res.append(emp_cov(prediction_sets, cont_val.numpy()))
 
 plt.figure()
 plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)

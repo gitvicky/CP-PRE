@@ -334,4 +334,19 @@ plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
 
-# %% 
+# %%  
+#Inverting the Bounds 
+u_lower = D.integrate(torch.tensor(prediction_sets[0]))
+u_upper = D.integrate(torch.tensor(prediction_sets[1]))
+
+x_values = x[1:-1]
+idx = 5
+values = {"Residual":uu[idx][1:-1, 1:-1], 
+          "Lower": u_lower[idx][1:-1, 1:-1],
+          "Upper": u_upper[idx][1:-1, 1:-1]
+          }
+
+indices = [6, 12, 18, 24]
+subplots_1d(x_values, values, indices, "CP within the residual space.")
+
+# %%
