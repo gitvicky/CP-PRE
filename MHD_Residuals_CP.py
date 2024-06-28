@@ -140,8 +140,8 @@ def unstack_fields(field, axis, variable_names):
     
     return variables
 
-# rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
-rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
+rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
+# rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
 # %% 
 #Estimating the Residuals
@@ -180,6 +180,14 @@ values = [u[idx, t_idx], v[idx, t_idx],
 titles = ["u", "v", 
           "rho", "p",
           "bx", "by"]
+
+subplots_2d(values, titles)
+
+# Example values to plot
+idx = 0
+t_idx = 5
+values = [cont_cal[idx, t_idx][1:-1,1:-1], gauss_cal[idx, t_idx][1:-1,1:-1]]
+titles = ["Cont.", "Div B"]
 
 subplots_2d(values, titles)
 
@@ -249,3 +257,6 @@ plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
 # %% 
+
+
+
