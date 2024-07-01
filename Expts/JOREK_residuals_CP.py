@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Desc. 
+Reduced MHD with Multi-Blob Diffusion utilised in https://iopscience.iop.org/article/10.1088/1741-4326/ad313a
+
+Eqns: 
+
+1). 
+2).
+3). 
+
+
 """
 
 # %%
@@ -50,7 +58,7 @@ from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
 
-from plot_tools import subplots_2d
+from Utils.plot_tools import subplots_2d
 
 # %% 
 #Setting up locations. 
@@ -153,7 +161,7 @@ rho, phi, T = unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
 # Example values to plot
 idx = 0
-t_idx = 5
+t_idx = 30
 values = [rho[idx, t_idx], phi[idx, t_idx], 
           T[idx, t_idx]]
 titles = ["rho", "phi", 
@@ -174,7 +182,7 @@ gamma = 1/dx**2
 
 alpha, beta, gamma = 1,1,1
 
-from ConvOps import ConvOperator
+from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
 D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
 D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
@@ -253,3 +261,5 @@ D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
 
 
+
+# %%

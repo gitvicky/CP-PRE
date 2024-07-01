@@ -52,11 +52,13 @@ from pyDOE import lhs
 
 # %%
 #Importing the models and utilities. 
+import sys
+sys.path.append("..")
 from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
 
-from plot_tools import subplots_2d
+from Utils.plot_tools import subplots_2d
 
 # %% 
 #Setting up locations. 
@@ -153,7 +155,7 @@ dt = t[-1] - t[-2]
 alpha = 1/dx**2
 beta = 1/dt**2
 
-from ConvOps import ConvOperator
+from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
 D_tt = ConvOperator('t', 2)#, scale=alpha)
 D_xx_yy = ConvOperator(('x','y'), 2)#, scale=beta)

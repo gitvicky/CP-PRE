@@ -46,11 +46,13 @@ from tqdm import tqdm
 
 # %%
 #Importing the models and utilities. 
+import sys
+sys.path.append("..")
 from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
 
-from plot_tools import subplots_2d
+from Utils.plot_tools import subplots_2d
 
 # %% 
 #Setting up locations. 
@@ -156,7 +158,7 @@ gamma = 1/dx**2
 
 alpha, beta, gamma = 1,1,1
 
-from ConvOps import ConvOperator
+from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
 D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
 D_x = ConvOperator(domain='x', order=1)#, scale=beta) 

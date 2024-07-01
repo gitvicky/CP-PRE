@@ -43,6 +43,8 @@ from tqdm import tqdm
 
 # %%
 #Importing the models and utilities. 
+import sys
+sys.path.append("..")
 from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
