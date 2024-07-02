@@ -166,12 +166,30 @@ D_y = ConvOperator(domain='y', order=1)#, scale=beta)
 D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
 D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
+from Utils.VectorConvOps import Divergence
+div = Divergence()
+
 # Residual Estimation
 #Continuity 
 cont_cal = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
 
 #Gauss Law 
 gauss_cal = D_x(Bx) + D_y(By)
+# gauss_cal = div(Bx, By)
+
+#Mom_x
+mom_x_cal = D_t(u) + u*D_x(u) + (1/rho)*D_x(p) - 2*(Bx/rho)*D_x(Bx) + v*D_y(u) - (By/rho)*D_y(Bx) - (Bx/rho)*D_y(By)
+
+#Mom_y 
+mom_y_cal = D_t(v) + u*D_x(v) + (1/rho)*D_y(p) - 2*(By/rho)*D_y(By) + v*D_y(v) - (By/rho)*D_x(Bx) - (Bx/rho)*D_x(By)
+
+#Euler Equation
+
+#Induction Equation along X 
+ind_x_cal = D_t(Bx) - By*D_y(u) + Bx*D_y(v) - v*D_y(Bx) + u*D_y(By) 
+
+#Induction Equation along Y 
+ind_y_cal = D_t(By) - By*D_x(u) - By*D_x(v) - v*D_x(Bx) + u*D_x(By)
 # %% 
 # Example values to plot
 idx = 0
@@ -188,8 +206,8 @@ subplots_2d(values, titles)
 # Example values to plot
 idx = 0
 t_idx = 5
-values = [cont_cal[idx, t_idx][1:-1,1:-1], gauss_cal[idx, t_idx][1:-1,1:-1]]
-titles = ["Cont.", "Div B"]
+values = [cont_cal[idx, t_idx][1:-1,1:-1], gauss_cal[idx, t_idx][1:-1,1:-1], mom_x_cal[idx, t_idx][1:-1,1:-1], mom_y_cal[idx, t_idx][1:-1,1:-1], ind_x_cal[idx, t_idx][1:-1,1:-1], ind_y_cal[idx, t_idx][1:-1,1:-1]]
+titles = ["Cont.", "Div B", "MomX", "MomY", "IndX", "IndY"]
 
 subplots_2d(values, titles)
 

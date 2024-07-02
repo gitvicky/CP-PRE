@@ -12,7 +12,6 @@ import numpy as np
 import torch 
 import torch.nn.functional as F
 
-
 def get_stencil(dims, deriv_order, taylor_order=2):
     if dims == 1:
         if deriv_order == 2 and taylor_order == 2:

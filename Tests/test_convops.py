@@ -32,7 +32,7 @@ D_xx_yy = ConvOperator(('x','y'), 2)#, scale=beta)
 deriv_basic = D_xx_yy(field)
 
 #Using Laplace Class
-from Utils.ConvOps_2d import Laplace
+from Utils.VectorConvOps import Laplace
 D_laplace = Laplace()
 deriv_laplace = D_laplace(field)
 
