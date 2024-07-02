@@ -81,7 +81,7 @@ sim = Advection_1d(Nx, Nt, x_min, x_max, t_end)
 n_train = configuration['n_train']
 
 lb = np.asarray([0.1, 0.1]) #pos, velocity
-ub = np.asarray([1.0, 1.0])
+ub = np.asarray([0.7, 0.7])
 
 params = lb + (ub - lb) * lhs(2, n_train)
 
@@ -186,7 +186,7 @@ print('Testing Error (MAE) : %.3e' % (mae))
 
 n_cal = configuration['n_cal']
 
-lb = np.asarray([0.1, 0.1]) #pos, velocity
+lb = np.asarray([0.7, 0.7]) #pos, velocity
 ub = np.asarray([1.0, 1.0])
 
 params = lb + (ub - lb) * lhs(2, n_train)
@@ -241,7 +241,7 @@ D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
 cal_residual = D(uu_cal)
 
 # %% 
-from plot_tools import subplots_2d
+from Utils.plot_tools import subplots_2d
 values = [cal_residual[0, 1:-1, 1:-1]]
 titles = ["Residual"]
 
@@ -251,7 +251,7 @@ subplots_2d(values, titles)
 
 n_pred = configuration['n_pred']
 
-lb = np.asarray([0.1, 0.1]) #pos, velocity
+lb = np.asarray([0.7, 0.7]) #pos, velocity
 ub = np.asarray([1.0, 1.0])
 
 params = lb + (ub - lb) * lhs(2, n_train)
@@ -302,7 +302,7 @@ prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
 
 # %% 
 
-from plot_tools import subplots_1d
+from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 5
 values = {"Residual": pred_residual[idx][1:-1, 1:-1], 

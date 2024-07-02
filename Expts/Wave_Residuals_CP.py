@@ -327,6 +327,6 @@ titles = ['Solution: t=' + str(t_idx),
           'Upper Bar: t=' + str(t_idx)
           ]
 
-subplots_2d(values, titles, "Inverted Bounds")
+# subplots_2d(values, titles, "Inverted Bounds")
 
 # %%

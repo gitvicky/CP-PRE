@@ -84,8 +84,8 @@ t_slice = 10
 # x_slice, t_slice = 1, 1
 # alpha, beta, gamma = 1.0, 1.0, 1.0
 
-lb = np.asarray([-3, -3, -3]) # Lower Bound of the parameter domain
-ub = np.asarray([3, 3, 3]) # Upper bound of the parameter domain
+lb = np.asarray([3, 3, 3]) # Lower Bound of the parameter domain
+ub = np.asarray([5, 5, 5]) # Upper bound of the parameter domain
 
 params = lb + (ub - lb) * lhs(3, n_cal)
 u_sol = []
@@ -138,7 +138,7 @@ print('(MAE) Error: %.3e' % (mae))
 # pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 pred = pred_encoded
 
-from plot_tools import subplots_1d
+from Utils.plot_tools import subplots_1d
 x = x
 values = {"Numerical": u_out[0,0].T, 
           "Prediction": pred[0,0].T
@@ -181,8 +181,8 @@ subplots_1d(x_values, y_values, indices, "Residuals")
 # %% 
 #Generating Prediction Data
 n_pred = configuration['n_pred']
-lb = np.asarray([-3, -3, -3]) # Lower Bound of the parameter domain
-ub = np.asarray([3, 3, 3]) # Upper bound of the parameter domain
+lb = np.asarray([3, 3, 3]) # Lower Bound of the parameter domain
+ub = np.asarray([5, 5, 5]) # Upper bound of the parameter domain
 
 params = lb + (ub - lb) * lhs(3, n_pred)
 u_sol = []
@@ -243,7 +243,6 @@ prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
 
 # %% 
 
-from plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 0
 values = {"Residual": pred_residual[idx][1:-1, 1:-1], 

@@ -14,7 +14,6 @@ import torch.nn.functional as F
 
 
 def get_stencil(dims, deriv_order, taylor_order=2):
-
     if dims == 1:
         if deriv_order == 2 and taylor_order == 2:
             return torch.tensor([
@@ -88,7 +87,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=None, taylor_order=2):
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
@@ -232,4 +231,58 @@ class ConvOperator():
         """
         outputs = self.forward(inputs)
         return outputs
+
+
+#############################################  
+#Vector Operations 
+#############################################  
+
+class Laplace(ConvOperator):
+    def __init__(self, domain=('x','y'), order=2, scale=1.0, taylor_order=2):
+        super(Laplace, self).__init__()
+
+        self.laplace_x = ConvOperator(domain[0], order, scale, taylor_order)
+        self.laplace_y = ConvOperator(domain[1], order, scale, taylor_order)
+
+
+    def __call__(self, input_x, input_y):
+
+        outputs = self.laplace_x(input_x) + self.laplace_y(input_y)
+        return outputs
+
+
+class Divergence(ConvOperator):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+        super(Divergence, self).__init__()
+        
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+
+    def __call__(self, input_x, input_y):
+
+        outputs = self.grad_x(input_x) + self.grad_y(input_y)
+        return outputs
     
+class Gradient(ConvOperator):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+        super(Gradient, self).__init__()
+        
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+
+    def __call__(self, input_x, input_y):
+
+        outputs = self.grad_x(input_x), self.grad_y(input_y)
+        return outputs
+    
+class Curl(ConvOperator):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+        super(Curl, self).__init__()
+        
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+
+    def __call__(self, input_x, input_y):
+
+        outputs = self.grad_x(input_y) - self.grad_y(input_x)
+        return outputs

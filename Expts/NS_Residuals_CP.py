@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Desc. 
+Incompressible Navier-Stokes - Finite Volume Solver.
+
+Parameterisation of calibration and prediction data: 
+        lb = np.asarray([0.1, 0.1]) #a, b
+        ub = np.asarray([0.5, 0.5])
 """
 
 # %%
@@ -57,7 +62,7 @@ from Utils.plot_tools import subplots_2d
 # %% 
 #Setting up locations. 
 file_loc = os.getcwd()
-data_loc = file_loc + '/Neural_PDE/Data'
+data_loc = os.path.dirname(file_loc)  + '/Neural_PDE/Data'
 model_loc = file_loc + '/Weights'
 plot_loc = file_loc + '/Plots'
 #Setting up the seeds and devices

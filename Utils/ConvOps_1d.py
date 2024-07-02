@@ -73,7 +73,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=None, taylor_order=2):
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
