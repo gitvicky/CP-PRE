@@ -86,7 +86,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='conv'):
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='conv', device='cpu'):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
@@ -109,13 +109,18 @@ class ConvOperator():
             
             self.kernel = kernel_3d(self.stencil, self.axis)
             self.kernel = scale*self.kernel
+            self.kernel = self.kernel.to(device)
 
-            if conv == 'conv': 
-                self.conv = self.convolution
-            elif conv == 'spectral':
-                self.conv = self.spectral_convolution
         except:
             pass
+
+
+        if conv == 'conv': 
+            self.conv = self.convolution
+        elif conv == 'spectral':
+            self.conv = self.spectral_convolution
+        else:
+            raise ValueError("Unknown Convolution Method")
 
     def convolution(self, field, kernel=None):
         """
