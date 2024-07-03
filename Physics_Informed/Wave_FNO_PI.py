@@ -12,11 +12,11 @@ configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
                  "Epochs": 5000,
-                 "Batch Size": 50,
+                 "Batch Size": 1,
                  "Optimizer": 'Adam',
-                 "Learning Rate": 0.005,
-                 "Scheduler Step": 100,
-                 "Scheduler Gamma": 0.5,
+                 "Learning Rate": 1e-2,
+                 "Scheduler Step": 500,
+                 "Scheduler Gamma": 0.9,
                  "Activation": 'GeLU',
                  "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
@@ -36,7 +36,7 @@ configuration = {"Case": 'Wave',
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'Tests', 'AR'], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'Tests', 'AR', 'Wave'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
 run.save(os.path.abspath(__file__), 'code')
@@ -101,6 +101,8 @@ c = 0.5 #Wave Speed <=1.0
 
 solver = Wave_2D(Nx, x_min, x_max, tend, c)
 xx, yy, t, u_sol = solver.solve(Lambda, aa, bb) #solution shape -> t, x, y
+u_sol = u_sol[::5]
+t = t[::5]
 
 dx = xx[-1] - xx[-2]
 dy = yy[-1] - yy[-2]
@@ -205,7 +207,8 @@ D = ConvOperator(device=device) #Additive Kernels
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 
 def residual_loss(field):
-    return D(field)
+    field = field[:, 0].permute(0, 3, 1, 2)
+    return 1e3*D(field)
 
 loss_func = residual_loss
     
@@ -239,7 +242,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
             xx = torch.cat((xx[..., step:], im), dim=-1)
         
-        pred = u_normalizer.decode(pred)[:,0]
+        pred = u_normalizer.decode(pred)
         loss = residual_loss(pred).pow(2).mean()
         train_loss += loss.item()
 
@@ -304,8 +307,6 @@ pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()
 #Plotting performance
 
 idx=0
-
-# %%
 
 u_field = test_u[idx]
     
