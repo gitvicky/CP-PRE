@@ -166,12 +166,16 @@ D_y = ConvOperator(domain='y', order=1)#, scale=beta)
 D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
 D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
-from Utils.VectorConvOps import Divergence
+from Utils.VectorConvOps import *
 div = Divergence()
+grad = Gradient()
 
 # Residual Estimation
 #Continuity 
 cont_cal = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
+
+cont_cal = D_t(rho) + dot(grad(rho, rho), torch.stack((u,v))) + rho*div(u,v)
+
 
 #Gauss Law 
 gauss_cal = D_x(Bx) + D_y(By)

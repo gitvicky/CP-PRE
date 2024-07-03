@@ -172,6 +172,11 @@ D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 # residual_cont = D_x(u) + D_y(v) 
 residual_cont_cal = D_x(u) + (dx/dy) * D_y(v) #Rescaling
 
+#Using vector ops 
+from Utils.VectorConvOps import *
+div = Divergence() 
+residual_cont_cal = div(u, v)
+
 #Momentum
 # residual_mom_x = D_t(u) + u*D_x(u) + v*D_y(u) - nu*D_xx_yy(u) + D_x(p)
 residual_momx_cal = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy #Rescaling

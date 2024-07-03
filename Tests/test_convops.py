@@ -34,7 +34,7 @@ deriv_basic = D_xx_yy(field)
 #Using Laplace Class
 from Utils.VectorConvOps import Laplace
 D_laplace = Laplace()
-deriv_laplace = D_laplace(field)
+deriv_laplace = D_laplace(field, field)
 
 # %% 
 from Utils.plot_tools import subplots_2d
@@ -56,9 +56,9 @@ deriv_div = D_x(field) +  D_y(field)
 deriv_y = D_y(field)
 
 #Using Divergence Class
-from Utils.ConvOps_2d import Divergence
+from Utils.VectorConvOps import Divergence
 D_laplace = Divergence()
-deriv_divs = D_laplace(field)
+deriv_divs = D_laplace(field, field)
 
 # %% 
 from Utils.plot_tools import subplots_2d
@@ -74,9 +74,9 @@ subplots_2d(values, titles)
 
 # %%
 #Using Gradient  Class
-from Utils.ConvOps_2d import Gradient
+from Utils.VectorConvOps import Gradient
 D_grad = Gradient()
-g_x, g_y = D_grad(field)
+g_x, g_y = D_grad(field, field)
 
 # %% 
 from Utils.plot_tools import subplots_2d
