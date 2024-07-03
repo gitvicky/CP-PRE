@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FNO modelled over the 2D Wave Equation auto-regressively - Trained without any data in a physics informed manner. 
+FNO modelled over the 2D Wave Equation auto-regressively - Finetuned without any data in a physics informed manner. 
 
 Equation: u_tt = D*(u_xx + u_yy), D=1.0
 
@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 500,
+                 "Epochs": 5000,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -29,7 +29,7 @@ configuration = {"Case": 'Wave',
                  "Variables":1, 
                  "Loss Function": 'Residual',
                  "UQ": 'None', #None, Dropout
-                 "Config": 'Basic' #Basic or fine-tune
+                 "Config": 'fine-tune' #Basic or fine-tune
                  }
 
 # %%
@@ -62,6 +62,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 # %%
 #Importing the models and utilities. 
+import sys
+sys.path.append("..")
+
 from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
@@ -85,19 +88,25 @@ from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import *
 
 t1 = default_timer()
 
-Lambda = 20 #Amplitude of the initial Gaussian. 
-a = 0.25 #x-position of initial gaussian
-b = -0.25 #y-position of initial gaussian 
+Nx = 64 # Mesh Discretesiation 
+x_min = -1.0 # Minimum value of x
+x_max = 1.0 # maximum value of x
+y_min = -1.0 # Minimum value of y 
+y_max = 1.0 # Minimum value of y
+tend = 1
+Lambda = 40 #Gaussian Amplitude
+aa = 0.25 #X-pos
+bb = 0.25 #Y-pos
+c = 0.5 #Wave Speed <=1.0
 
-solver = Wave_2D(Lambda, a , b)
-xx, yy, t, u_sol = solver.solve() #solution shape -> t, x, y
+solver = Wave_2D(Nx, x_min, x_max, tend, c)
+xx, yy, t, u_sol = solver.solve(Lambda, aa, bb) #solution shape -> t, x, y
 
 dx = xx[-1] - xx[-2]
 dy = yy[-1] - yy[-2]
 dt = t[-1] - t[-2]
 
-u_sol = torch.tensor(u_sol, dtype=torch.float32).unsqueeze(0).permute(0, 2, 3, 1)
-u =u_sol
+u = torch.tensor(u_sol, dtype=torch.float32).unsqueeze(0).permute(0, 2, 3, 1).unsqueeze(1)
 # %% 
 ntrain = 1
 ntest = 1
@@ -123,7 +132,7 @@ test_u = u[-ntest:,:,:,:,T_in:T_out+T_in]
 
 print("Training Input: " + str(train_a.shape))
 print("Training Output: " + str(train_u.shape))
-
+    
 # %%
 #Normalising the train and test datasets with the preferred normalisation. 
 
@@ -136,9 +145,16 @@ elif norm_strategy == 'Range':
 elif norm_strategy == 'Gaussian':
     normalizer = GaussianNormalizer
 
-a_normalizer = normalizer(train_a)
-u_normalizer = normalizer(train_u)
 
+norms = np.load(model_loc + '/FNO_Wave_charitable-sea_norms.npz')
+
+a_normalizer = normalizer(train_a)
+a_normalizer.a = torch.tensor(norms['in_a'])
+a_normalizer.b = torch.tensor(norms['in_b'])
+
+u_normalizer = normalizer(train_u)
+u_normalizer.a = torch.tensor(norms['out_a'])
+u_normalizer.b = torch.tensor(norms['out_b'])
 # %% 
 train_a = a_normalizer.encode(train_a)
 test_a = a_normalizer.encode(test_a)
@@ -169,7 +185,7 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 
 model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-# model.load_state_dict(torch.load(model_loc + '/FNO_Wave_null-shape.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -182,10 +198,10 @@ epochs = configuration['Epochs']
 
 #Defining the physics
 from Utils.ConvOps_2d import *
-dx, dy, dt, c = dx, dy, dt, 1
-D_tt = ConvOperator('t', 2)#, scale=alpha)
-D_xx_yy = ConvOperator(('x','y'), 2)#, scale=beta)
-D = ConvOperator() #Additive Kernels
+dx, dy, dt, c = dx, dy, dt, 0.5
+D_tt = ConvOperator(domain ='t', order=2, device=device)#, scale=alpha)
+D_xx_yy = ConvOperator(domain=('x','y'), order=2, device=device)#, scale=beta)
+D = ConvOperator(device=device) #Additive Kernels
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 
 def residual_loss(field):
@@ -195,20 +211,67 @@ loss_func = residual_loss
     
 # %%
 ####################################
-#Training Loop 
+#Training Loop - Residual Losses
 ####################################
+if device == 'cude':
+    u_normalizer.cuda()
+
+
 start_time = default_timer()
 for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss = 0
+    test_loss = 0 
+    for xx, yy in train_loader:
+        optimizer.zero_grad()
+        xx = xx.to(device)
+        yy = yy.to(device)
+        batch_size = xx.shape[0]
+
+        for t in range(0, T_out, step):
+            im = model(xx)
+            if t == 0:
+                pred = im
+            else:
+                pred = torch.cat((pred, im), -1)
+
+            xx = torch.cat((xx[..., step:], im), dim=-1)
+        
+        pred = u_normalizer.decode(pred)[:,0]
+        loss = residual_loss(pred).pow(2).mean()
+        train_loss += loss.item()
+
+        loss.backward()
+        optimizer.step()
+    
+    #Validation - L2 Error 
+    with torch.no_grad():
+        for xx, yy in test_loader:
+            xx = xx.to(device)
+            yy = yy.to(device)
+            batch_size = xx.shape[0]
+
+            for t in range(0, T_out, step):
+                im = model(xx)
+                if t == 0:
+                    pred = im
+                else:
+                    pred = torch.cat((pred, im), -1)
+
+                xx = torch.cat((xx[..., step:], im), dim=-1)
+            
+            loss = (pred - yy).pow(2).mean()
+            test_loss += loss.item()
+    
+
     t2 = default_timer()
 
-    train_loss = train_loss / ntrain / num_vars
-    test_loss = test_loss / ntest / num_vars
+    train_loss = train_loss 
+    test_loss = test_loss
 
-    print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
+    print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
     
     scheduler.step()
@@ -240,8 +303,7 @@ pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()
 # %% 
 #Plotting performance
 
-idx = np.random.randint(0,ntest) 
-idx = 5
+idx=0
 
 # %%
 
