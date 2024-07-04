@@ -208,7 +208,7 @@ D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel
 
 def residual_loss(field):
     field = field[:, 0].permute(0, 3, 1, 2)
-    return 1e3*D(field)
+    return D(field)
 
 loss_func = residual_loss
     
@@ -216,14 +216,14 @@ loss_func = residual_loss
 ####################################
 #Training Loop - Residual Losses
 ####################################
-if device == 'cude':
+if device == 'cuda':
     u_normalizer.cuda()
 
 
 start_time = default_timer()
+model.train()
 for ep in range(epochs): #Training Loop - Epochwise
 
-    model.train()
     t1 = default_timer()
     train_loss = 0
     test_loss = 0 
@@ -246,8 +246,8 @@ for ep in range(epochs): #Training Loop - Epochwise
         loss = residual_loss(pred).pow(2).mean()
         train_loss += loss.item()
 
-        loss.backward()
-        optimizer.step()
+    loss.backward()
+    optimizer.step()
     
     #Validation - L2 Error 
     with torch.no_grad():
@@ -267,7 +267,6 @@ for ep in range(epochs): #Training Loop - Epochwise
             
             loss = (pred - yy).pow(2).mean()
             test_loss += loss.item()
-    
 
     t2 = default_timer()
 
