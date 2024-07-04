@@ -169,6 +169,7 @@ D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 from Utils.VectorConvOps import *
 div = Divergence()
 grad = Gradient()
+grad_time = Gradient(domain=('t', 't'))
 
 # Residual Estimation
 #Continuity 
@@ -194,6 +195,13 @@ ind_x_cal = D_t(Bx) - By*D_y(u) + Bx*D_y(v) - v*D_y(Bx) + u*D_y(By)
 
 #Induction Equation along Y 
 ind_y_cal = D_t(By) - By*D_x(u) - By*D_x(v) - v*D_x(Bx) + u*D_x(By)
+
+#Induction Equation-Vectorised
+ind_cal = grad_time(Bx, By)  - curl
+
+
+
+
 # %% 
 # Example values to plot
 idx = 0

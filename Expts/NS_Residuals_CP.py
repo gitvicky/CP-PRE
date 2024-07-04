@@ -172,24 +172,30 @@ D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 # residual_cont = D_x(u) + D_y(v) 
 residual_cont_cal = D_x(u) + (dx/dy) * D_y(v) #Rescaling
 
-#Using vector ops 
+#Momentum
+residual_momx_cal = D_t(u) + u*D_x(u) + v*D_y(u) - nu*D_xx_yy(u) + D_x(p)
+# residual_momx_cal = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy #Rescaling
+
+residual_momy_cal = D_t(v) + u*D_y(v) + v*D_y(v) - nu*D_xx_yy(v) + D_y(p)
+# residual_momy_cal = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx #Rescaling
+
+# %% 
+#Using Vector Operations 
 from Utils.VectorConvOps import *
 div = Divergence() 
 residual_cont_cal = div(u, v)
 
-#Momentum
-# residual_mom_x = D_t(u) + u*D_x(u) + v*D_y(u) - nu*D_xx_yy(u) + D_x(p)
-residual_momx_cal = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy #Rescaling
-
-# residual_mom_y = D_t(v) + u*D_y(v) + v*D_y(v) - nu*D_xx_yy(v) + D_y(p)
-residual_momy_cal = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx #Rescaling
+grad = Gradient()
+laplace = Laplace()
+grad_time = Gradient(domain=('t', 't'))
+residual_mom_cal = grad_time(u,v) + vectorize(dot(vectorize(u,v), grad(u)), dot(vectorize(u,v), grad(v))) - nu*laplace(u,v) + grad(p)
 
 # %% 
 # Example values to plot
 idx = 0
 t_idx = 5
-values = [residual_cont_cal[idx, t_idx][1:-1,1:-1], residual_momx_cal[idx, t_idx][1:-1,1:-1], residual_momy_cal[idx, t_idx][1:-1,1:-1]]
-titles = ["Cont.", "Mom_X", "Mom_Y"]
+values = [residual_cont_cal[idx, t_idx][1:-1,1:-1], residual_momx_cal[idx, t_idx][1:-1,1:-1], residual_momy_cal[idx, t_idx][1:-1,1:-1], residual_mom_cal[0, idx, t_idx][1:-1,1:-1]]
+titles = ["Cont.", "Mom_X", "Mom_Y", "MomX_Vector"]
 
 subplots_2d(values, titles)
 
