@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 5000,
+                 "Epochs": 1000,
                  "Batch Size": 1,
                  "Optimizer": 'Adam',
                  "Learning Rate": 1e-2,
@@ -29,7 +29,7 @@ configuration = {"Case": 'Wave',
                  "Variables":1, 
                  "Loss Function": 'Residual',
                  "UQ": 'None', #None, Dropout
-                 "Config": 'fine-tune' #Basic or fine-tune
+                 "Config": 'basic' #Basic or fine-tune
                  }
 
 # %%
@@ -187,7 +187,8 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 
 model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
+if configuration['Config'] == 'finetune':
+    model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -207,9 +208,8 @@ D = ConvOperator(device=device) #Additive Kernels
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 
 def residual_loss(field):
-    print(field.shape)
-    field = field[:, 0].permute(0, 3, 1, 2)
-    return D(field)
+    field = field[:, 0, 1:-1, 1:-1, 1:-1].permute(0, 3, 1, 2) #Taking care of the Boundaries. 
+    return 1e3*D(field)
 
 loss_func = residual_loss
     
