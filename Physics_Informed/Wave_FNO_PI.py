@@ -207,6 +207,7 @@ D = ConvOperator(device=device) #Additive Kernels
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 
 def residual_loss(field):
+    print(field.shape)
     field = field[:, 0].permute(0, 3, 1, 2)
     return D(field)
 
