@@ -193,26 +193,32 @@ Z = torch.tensor(y_grid, dtype=torch.float32)
 D = torch.tensor(3.4, dtype=torch.float32)
 mu = torch.tensor(2.25 * 1e-6, dtype=torch.float32)
 K = torch.tensor(2.25 * 1e-7, dtype=torch.float32)
-
+gamma =  torch.tensor(5/3, dtype=torch.float32)
 
 from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
-D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
-D_R = ConvOperator(domain='x', order=1)#, scale=beta) 
-D_Z = ConvOperator(domain='y', order=1)#, scale=beta)
-D_RR = ConvOperator(domain='x', order=2)#, scale=gamma)
-D_ZZ = ConvOperator(domain='y', order=2)#, scale=gamma)
+D_t = ConvOperator(domain='t', order=1, scale=alpha)
+D_R = ConvOperator(domain='x', order=1, scale=beta) 
+D_Z = ConvOperator(domain='y', order=1, scale=beta)
+D_RR = ConvOperator(domain='x', order=2, scale=gamma)
+D_ZZ = ConvOperator(domain='y', order=2, scale=gamma)
 
 # Residual Estimation
-# cont_cal = D_t(rho) - R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - 2*rho*D_Z(phi) - D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
-cont_cal = 2*dx*dy*D_t(rho) - (dt)*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - (2*dt*dy)*2*rho*D_Z(phi) - (4*dt)*D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
+cont_cal = D_t(rho) - R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - 2*rho*D_Z(phi) - D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
+# cont_cal = 2*dx*dy*D_t(rho) - (dt)*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - (2*dt*dy)*2*rho*D_Z(phi) - (4*dt)*D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
 
+# %% 
+temp_cal = T*D_t(rho) + rho*D_t(T) - rho*R*(D_R(T)*D_Z(phi) - D_R(phi)*D_Z(T)) +  \
+            T*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) + \
+            2*gamma*rho*T*D_Z(phi) + \
+            K * (D_RR(T) + (1/R)*D_R(T) + D_ZZ(T))    
+                    
 # %% 
 # # Example values to plot
 idx = 0
 t_idx = 5
-values = [cont_cal[idx, t_idx][1:-1,1:-1]]
-titles = ["Cont."]
+values = [cont_cal[idx, t_idx][1:-1,1:-1], temp_cal[idx, t_idx][1:-1,1:-1]]
+titles = ["Cont.", "Temp."]
 
 subplots_2d(values, titles)
 
