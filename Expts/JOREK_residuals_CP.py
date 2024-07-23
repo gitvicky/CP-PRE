@@ -9,6 +9,7 @@ Eqns:
 2).
 3). 
 
+In toroidal coordinates - x: R, y: Z
 
 """
 
@@ -159,12 +160,12 @@ def unstack_fields(field, axis, variable_names):
     
     return variables
 
-# rho, phi, T = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
-rho, phi, T = unstack_fields(u_out, axis=1, variable_names=field)#Solution
+rho, phi, T = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
+# rho, phi, T = unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
 # Example values to plot
 idx = 0
-t_idx = 30
+t_idx = 5
 values = [rho[idx, t_idx], phi[idx, t_idx], 
           T[idx, t_idx]]
 titles = ["rho", "phi", 
@@ -175,9 +176,9 @@ subplots_2d(values, titles)
 # %% 
 #Estimating the Residuals
 
-dx = np.asarray(x_grid[-1] - x_grid[-2])
+dx = torch.tensor(np.asarray(x_grid[-1] - x_grid[-2]), dtype=torch.float32)
 dy = dx
-dt = np.asarray(t_grid[-1] - t_grid[-2])
+dt = torch.tensor(np.asarray(t_grid[-1] - t_grid[-2]), dtype=torch.float32)
 
 alpha = 1/dt*2
 beta = 1/dx*2
@@ -185,84 +186,93 @@ gamma = 1/dx**2
 
 alpha, beta, gamma = 1,1,1
 
+R = torch.tensor(x_grid, dtype=torch.float32)
+Z = torch.tensor(y_grid, dtype=torch.float32)
+
+#Coefficients 
+D = torch.tensor(3.4, dtype=torch.float32)
+mu = torch.tensor(2.25 * 1e-6, dtype=torch.float32)
+K = torch.tensor(2.25 * 1e-7, dtype=torch.float32)
+
+
 from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
 D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
-D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
-D_y = ConvOperator(domain='y', order=1)#, scale=beta)
-D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
-D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
+D_R = ConvOperator(domain='x', order=1)#, scale=beta) 
+D_Z = ConvOperator(domain='y', order=1)#, scale=beta)
+D_RR = ConvOperator(domain='x', order=2)#, scale=gamma)
+D_ZZ = ConvOperator(domain='y', order=2)#, scale=gamma)
 
 # Residual Estimation
+# cont_cal = D_t(rho) - R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - 2*rho*D_Z(phi) - D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
+cont_cal = 2*dx*dy*D_t(rho) - (dt)*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - (2*dt*dy)*2*rho*D_Z(phi) - (4*dt)*D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
 
+# %% 
 # # Example values to plot
-# idx = 0
-# t_idx = 5
-# values = [cont_cal[idx, t_idx][1:-1,1:-1], gauss_cal[idx, t_idx][1:-1,1:-1]]
-# titles = ["Cont.", "Div B"]
+idx = 0
+t_idx = 5
+values = [cont_cal[idx, t_idx][1:-1,1:-1]]
+titles = ["Cont."]
 
-# subplots_2d(values, titles)
+subplots_2d(values, titles)
 
-# # %% 
-# #Obtaining the predictions 
-# n_pred = configuration['n_pred']
-# u_in = vars[n_cal:n_cal+n_pred,...,:configuration['T_in']]
-# u_out = vars[n_cal:n_cal+n_pred,...,configuration['T_in'] : configuration['T_in'] + configuration['T_out']]
+# %% 
+#Obtaining the predictions 
+n_pred = configuration['n_pred']
+u_in = vars[n_cal:n_cal+n_pred,...,:configuration['T_in']]
+u_out = vars[n_cal:n_cal+n_pred,...,configuration['T_in'] : configuration['T_in'] + configuration['T_out']]
 
-# #Normalisations
-# u_in = in_normalizer.encode(u_in)
-# u_out_encoded = out_normalizer.encode(u_out)
+#Normalisations
+u_in = in_normalizer.encode(u_in)
+u_out_encoded = out_normalizer.encode(u_out)
 
-# #Model Predictions.
-# pred_encoded, mse, mae = validation_AR(model, u_in, u_out_encoded, configuration['Step'], configuration['T_out'])
+#Model Predictions.
+pred_encoded, mse, mae = validation_AR(model, u_in, u_out_encoded, configuration['Step'], configuration['T_out'])
 
-# print('Prediction (MSE) Error: %.3e' % (mse))
-# print('Prediction (MAE) Error: %.3e' % (mae))
+print('Prediction (MSE) Error: %.3e' % (mse))
+print('Prediction (MAE) Error: %.3e' % (mae))
 
-# #Denormalising the predictions
-# pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
+#Denormalising the predictions
+pred = out_normalizer.decode(pred_encoded.to(device)).cpu()
 
-# rho, u, v, p, Bx, By = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
-# # rho, u, v, p, Bx, By= unstack_fields(u_out, axis=1, variable_names=field)#Solution
-
-# # Residual Estimation
-
-
-# # %% 
-# #Performing CP over the residual space
-# from Neural_PDE.UQ.inductive_cp import * 
-# ncf_scores = np.abs(cont_cal.numpy())# / (uu_cal.numpy() + 1e-6) #MINE
-
-# alpha = 0.1
-# qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-# prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat] 
-
-# # %% 
-# # #Checking for coverage:
-# #Obtaining the residuals for the Numerical Solution. 
+rho, phi, T = unstack_fields(pred, axis=1, variable_names=field)#Prediction 
 # rho, phi, T = unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
-# # Residual Estimation
+# Residual Estimation
+# cont_pred = D_t(rho) - R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - 2*rho*D_Z(phi) - D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
+cont_pred = 2*dx*dy*D_t(rho) - (dt)*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - (2*dt*dy)*2*rho*D_Z(phi) - (4*dt)*D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
 
+# %% 
+#Performing CP over the residual space
+from Neural_PDE.UQ.inductive_cp import * 
+ncf_scores = np.abs(cont_cal.numpy())# / (uu_cal.numpy() + 1e-6) #MINE
 
-# #Emprical Coverage for all values of alpha 
-# alpha_levels = np.arange(0.05, 0.95, 0.1)
-# emp_cov_res = []
-# for alpha in tqdm(alpha_levels):
-#     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-#     prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat]
-#     # prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()] #MINE
-#     emp_cov_res.append(emp_cov(prediction_sets, cont_val.numpy()))
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat] 
 
-# plt.figure()
-# plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
-# plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
-# plt.xlabel('1-alpha')
-# plt.ylabel('Empirical Coverage')
-# plt.legend()
-# # %% 
+# %% 
+# #Checking for coverage:
+#Obtaining the residuals for the Numerical Solution. 
+rho, phi, T = unstack_fields(u_out, axis=1, variable_names=field)#Solution
 
+# Residual Estimation
+# cont_val = D_t(rho) - R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - 2*rho*D_Z(phi) - D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
+cont_val = 2*dx*dy*D_t(rho) - (dt)*R*(D_R(rho)*D_Z(phi) - D_R(phi)*D_Z(rho)) - (2*dt*dy)*2*rho*D_Z(phi) - (4*dt)*D*(D_RR(rho) + (1/R)*D_R(rho) + D_ZZ(rho))
 
+#Emprical Coverage for all values of alpha 
+alpha_levels = np.arange(0.05, 0.95, 0.1)
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [cont_pred.numpy() - qhat, cont_pred.numpy() + qhat]
+    # prediction_sets = [pred_residual.numpy() - qhat*uu_pred.numpy(), pred_residual.numpy() + qhat*uu_pred.numpy()] #MINE
+    emp_cov_res.append(emp_cov(prediction_sets, cont_val.numpy()))
 
-
-# %%
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+# %% 
