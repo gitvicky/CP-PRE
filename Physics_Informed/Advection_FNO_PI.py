@@ -8,35 +8,34 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 """
 
 # %%
-configuration = {"Case": 'Wave',
+configuration = {"Case": 'Advection',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 1000,
-                 "Batch Size": 1,
+                 "Epochs": 500,
+                 "Batch Size": 100,
                  "Optimizer": 'Adam',
-                 "Learning Rate": 1e-2,
-                 "Scheduler Step": 500,
-                 "Scheduler Gamma": 0.9,
-                 "Activation": 'GeLU',
-                 "Physics Normalisation": 'No',
-                 "Normalisation Strategy": 'Min-Max',
+                 "Learning Rate": 0.001,
+                 "Scheduler Step": 100,
+                 "Scheduler Gamma": 0.5,
+                 "Activation": 'Tanh',
+                 "Normalisation Strategy": 'Identity',
                  "T_in": 20,    
-                 "T_out": 60,
-                 "Step": 10,
-                 "Width_time": 32, 
-                 "Width_vars": 0,  
+                 "T_out": 30,
+                 "Step": 30,
+                 "Width": 32, 
                  "Modes": 8,
-                 "Variables":1, 
+                 "Variables":1,
                  "Loss Function": 'Residual',
                  "UQ": 'None', #None, Dropout
-                 "Config": 'basic' #Basic or fine-tune
+                 "Config": 'basic', #Basic or fine-tune
+                 "n_train": 120
                  }
 
 # %%
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'Tests', 'AR', 'Wave'], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'Tests', 'Advection', 'Physics-Informed'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
 run.save(os.path.abspath(__file__), 'code')
@@ -84,53 +83,59 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ################################################################
 # Generating Numerical Simulation
 ################################################################
-from Neural_PDE.Numerical_Solvers.Wave.Wave_2D_Spectral import * 
-
 t1 = default_timer()
 
-Nx = 64 # Mesh Discretesiation 
-x_min = -1.0 # Minimum value of x
-x_max = 1.0 # maximum value of x
-y_min = -1.0 # Minimum value of y 
-y_max = 1.0 # Minimum value of y
-tend = 1
-Lambda = 40 #Gaussian Amplitude
-aa = 0.25 #X-pos
-bb = 0.25 #Y-pos
-c = 0.5 #Wave Speed <=1.0
+from Neural_PDE.Numerical_Solvers.Advection.Advection_1D import *
+from pyDOE import lhs
 
-solver = Wave_2D(Nx, x_min, x_max, tend, c)
-xx, yy, t, u_sol = solver.solve(Lambda, aa, bb) #solution shape -> t, x, y
-u_sol = u_sol[::5]
-t = t[::5]
+Nx = 200 #Number of x-points
+Nt = 50 #Number of time instances 
+x_min, x_max = 0.0, 2.0 #X min and max
+t_end = 0.5 #time length
 
-dx = xx[-1] - xx[-2]
-dy = yy[-1] - yy[-2]
-dt = t[-1] - t[-2]
+sim = Advection_1d(Nx, Nt, x_min, x_max, t_end) 
 
-u = torch.tensor(u_sol, dtype=torch.float32).unsqueeze(0).permute(0, 2, 3, 1).unsqueeze(1)
+n_train = configuration['n_train']
+
+lb = np.asarray([0.1, 0.1]) #pos, velocity
+ub = np.asarray([0.7, 0.7])
+
+params = lb + (ub - lb) * lhs(2, n_train)
+
+u_sol = []
+for ii in tqdm(range(n_train)):
+    xc = params[ii, 0]
+    v = params[ii, 1]
+    x, t, u_soln, u_exact = sim.solve(v, xc)
+    u_sol.append(u_soln)
+
+u_sol = np.asarray(u_sol)
+u_sol = u_sol[:, :, 1:-2]
+x = x[1:-2]
+velocity = params[:,1]
+
+u = torch.tensor(u_sol, dtype=torch.float32).permute(0, 2, 1).unsqueeze(1)
 # %% 
-ntrain = 1
-ntest = 1
-S = 64 #Grid Size
+ntrain = 100
+ntest = 20
+S = 200 #Grid Size
 
 #Extracting configuration files
 T_in = configuration['T_in']
 T_out = configuration['T_out']
 step = configuration['Step']
+width = configuration['Width']
 modes = configuration['Modes']
-width_vars = configuration['Width_vars']
-width_time = configuration['Width_time']
 output_size = configuration['Step']
 num_vars = configuration['Variables']
 batch_size = configuration['Batch Size']
 
 #Setting up train and test
-train_a = u[:ntrain,:,:,:,:T_in]
-train_u = u[:ntrain,:,:,:,T_in:T_out+T_in]
+train_a = u[:ntrain,:,:,:T_in]
+train_u = u[:ntrain,:,:,T_in:T_out+T_in]
 
-test_a = u[-ntest:,:,:,:,:T_in]
-test_u = u[-ntest:,:,:,:,T_in:T_out+T_in]
+test_a = u[-ntest:,:,:,:T_in]
+test_u = u[-ntest:,:,:,T_in:T_out+T_in]
 
 print("Training Input: " + str(train_a.shape))
 print("Training Output: " + str(train_u.shape))
@@ -146,33 +151,27 @@ elif norm_strategy == 'Range':
     normalizer = RangeNormalizer
 elif norm_strategy == 'Gaussian':
     normalizer = GaussianNormalizer
-
-
-norms = np.load(model_loc + '/FNO_Wave_charitable-sea_norms.npz')
+elif norm_strategy == 'Identity':
+    normalizer = Identity
 
 a_normalizer = normalizer(train_a)
-a_normalizer.a = torch.tensor(norms['in_a'])
-a_normalizer.b = torch.tensor(norms['in_b'])
-
 u_normalizer = normalizer(train_u)
-u_normalizer.a = torch.tensor(norms['out_a'])
-u_normalizer.b = torch.tensor(norms['out_b'])
-# %% 
+
 train_a = a_normalizer.encode(train_a)
 test_a = a_normalizer.encode(test_a)
 
 train_u = u_normalizer.encode(train_u)
 test_u_encoded = u_normalizer.encode(test_u)
 # %%
-#Saving Normalisation 
-saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
+# #Saving Normalisation 
+# saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
 
-np.savez(saved_normalisations, 
-        in_a=a_normalizer.a.numpy(), in_b=a_normalizer.b.numpy(), 
-        out_a=u_normalizer.a.numpy(), out_b=u_normalizer.b.numpy()
-        )
+# np.savez(saved_normalisations, 
+#         in_a=a_normalizer.a.numpy(), in_b=a_normalizer.b.numpy(), 
+#         out_a=u_normalizer.a.numpy(), out_b=u_normalizer.b.numpy()
+#         )
 
-run.save(saved_normalisations, 'output')
+# run.save(saved_normalisations, 'output')
 # %%
 #Setting up the data loaders. 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_a, train_u), batch_size=batch_size, shuffle=True)
@@ -186,9 +185,9 @@ print('preprocessing finished, time used:', t2-t1)
 # training and evaluation
 ################################################################
 
-model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-if configuration['Config'] == 'finetune':
-    model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
+model = FNO_multi1d(T_in, step, modes, num_vars, width, width_vars=0)
+# if configuration['Config'] == 'finetune':
+#     model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -200,16 +199,20 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['
 epochs = configuration['Epochs']
 
 #Defining the physics
-from Utils.ConvOps_2d import *
-dx, dy, dt, c = dx, dy, dt, 0.5
-D_tt = ConvOperator(domain ='t', order=2, device=device)#, scale=alpha)
-D_xx_yy = ConvOperator(domain=('x','y'), order=2, device=device)#, scale=beta)
-D = ConvOperator(device=device) #Additive Kernels
-D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
+from Utils.ConvOps_1d import *
+dx = torch.tensor(x[-1] - x[-2], dtype=torch.float32)
+dt = torch.tensor(t[-1] - t[-2], dtype=torch.float32)
+v = torch.tensor(velocity[:ntrain], dtype=torch.float32)
+
+D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
+D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
+# D = ConvOperator(device=device) #Additive Kernels
+# D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
 
 def residual_loss(field):
-    field = field[:, 0, 1:-1, 1:-1, 1:-1].permute(0, 3, 1, 2) #Taking care of the Boundaries. 
-    return 1e3*D(field)
+    field = field[:, 0, 1:-1, 1:-1].permute(0, 1, 2) #Taking care of the Boundaries. 
+    res =  D_t(field) + (v*dt/dx) * D_x(field)
+    return D(field)
 
 loss_func = residual_loss
     
@@ -220,11 +223,9 @@ loss_func = residual_loss
 if device == 'cuda':
     u_normalizer.cuda()
 
-
 start_time = default_timer()
-model.train()
 for ep in range(epochs): #Training Loop - Epochwise
-
+    model.train()
     t1 = default_timer()
     train_loss = 0
     test_loss = 0 
@@ -232,17 +233,8 @@ for ep in range(epochs): #Training Loop - Epochwise
         optimizer.zero_grad()
         xx = xx.to(device)
         yy = yy.to(device)
-        batch_size = xx.shape[0]
 
-        for t in range(0, T_out, step):
-            im = model(xx)
-            if t == 0:
-                pred = im
-            else:
-                pred = torch.cat((pred, im), -1)
-
-            xx = torch.cat((xx[..., step:], im), dim=-1)
-        
+        pred = model(xx)
         pred = u_normalizer.decode(pred)
         loss = residual_loss(pred).pow(2).mean()
         # loss = (pred-yy).pow(2).mean()
@@ -257,15 +249,8 @@ for ep in range(epochs): #Training Loop - Epochwise
             xx = xx.to(device)
             yy = yy.to(device)
             batch_size = xx.shape[0]
-
-            for t in range(0, T_out, step):
-                im = model(xx)
-                if t == 0:
-                    pred = im
-                else:
-                    pred = torch.cat((pred, im), -1)
-
-                xx = torch.cat((xx[..., step:], im), dim=-1)
+            
+            pred = model(xx)
             loss = (pred - yy).pow(2).mean()
             test_loss += loss
 
@@ -308,63 +293,31 @@ pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()
 
 idx=0
 
-u_field = test_u[idx]
-    
-v_min_1 = torch.min(u_field[0, :, :, 0])
-v_max_1 = torch.max(u_field[0, :, :, 0])
-
-v_min_2 = torch.min(u_field[0, :, :, int(T_out/ 2)])
-v_max_2 = torch.max(u_field[0, :, :, int(T_out/ 2)])
-
-v_min_3 = torch.min(u_field[0, :, :, -1])
-v_max_3 = torch.max(u_field[0, :, :, -1])
+u_field_soln = test_u[idx]
+u_field_pred = pred_set[idx]
 
 fig = plt.figure(figsize=plt.figaspect(0.5))
-ax = fig.add_subplot(2, 3, 1)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-# ax.title.set_text('Initial')
+ax = fig.add_subplot(1, 3, 1)
+ax.plot(x, u_field_soln[0, :, 0], label='Soln.')
+ax.plot(x, u_field_pred[0, :, 0], label='Pred.')
 ax.title.set_text('t=' + str(T_in))
-ax.set_ylabel('Solution')
-fig.colorbar(pcm, pad=0.05)
+ax.set_xlabel('x')
+ax.set_ylabel('u')
 
-ax = fig.add_subplot(2, 3, 2)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-# ax.title.set_text('Middle')
-ax.title.set_text('t=' + str(int((T_out+ T_in) / 2)))
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
+ax = fig.add_subplot(1, 3, 2)
+ax.plot(x, u_field_soln[0, :, int(T_out/ 2)], label='Soln.')
+ax.plot(x, u_field_pred[0, :, int(T_out/ 2)], label='Pred.')
+ax.title.set_text('t=' + str(int(T_in + (T_out / 2))))
+ax.set_xlabel('x')
+# ax.set_ylabel('u')
 
-ax = fig.add_subplot(2, 3, 3)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-# ax.title.set_text('Final')
+ax = fig.add_subplot(1, 3, 3)
+ax.plot(x, u_field_soln[0, :, -1], label='Soln.')
+ax.plot(x, u_field_pred[0, :, -1], label='Pred.')
 ax.title.set_text('t=' + str(T_out+ T_in))
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
-u_field = pred_set[idx]
-
-ax = fig.add_subplot(2, 3, 4)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-ax.set_ylabel('FNO')
-
-fig.colorbar(pcm, pad=0.05)
-
-ax = fig.add_subplot(2, 3, 5)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
-ax = fig.add_subplot(2, 3, 6)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
+ax.set_xlabel('x')
+# ax.set_ylabel('u')
+plt.legend()
 
 plot_name = plot_loc + '/' + configuration['Field'] + '_' + run.name + '.png'
 plt.savefig(plot_name)
