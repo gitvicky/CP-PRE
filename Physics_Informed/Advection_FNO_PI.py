@@ -223,48 +223,72 @@ loss_func = residual_loss
 if device == 'cuda':
     u_normalizer.cuda()
 
+
+
 start_time = default_timer()
 for ep in range(epochs): #Training Loop - Epochwise
+
     model.train()
     t1 = default_timer()
-    train_loss = 0
-    test_loss = 0 
-    for xx, yy in train_loader:
-        optimizer.zero_grad()
-        xx = xx.to(device)
-        yy = yy.to(device)
-
-        pred = model(xx)
-        pred = u_normalizer.decode(pred)
-        loss = residual_loss(pred).pow(2).mean()
-        # loss = (pred-yy).pow(2).mean()
-        train_loss += loss
-
-    train_loss.backward()
-    optimizer.step()
-    
-    #Validation - L2 Error 
-    with torch.no_grad():
-        for xx, yy in test_loader:
-            xx = xx.to(device)
-            yy = yy.to(device)
-            batch_size = xx.shape[0]
-            
-            pred = model(xx)
-            loss = (pred - yy).pow(2).mean()
-            test_loss += loss
-
+    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer)
     t2 = default_timer()
 
-    train_loss = train_loss.item()
-    test_loss = test_loss.item()
+    train_loss = train_loss / ntrain / num_vars
+    test_loss = test_loss / ntest / num_vars
 
-    print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
+    print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
     
     scheduler.step()
 
 train_time = default_timer() - start_time
+
+
+
+
+
+# start_time = default_timer()
+# for ep in range(epochs): #Training Loop - Epochwise
+#     model.train()
+#     t1 = default_timer()
+#     train_loss = 0
+#     test_loss = 0 
+#     for xx, yy in train_loader:
+#         optimizer.zero_grad()
+#         xx = xx.to(device)
+#         yy = yy.to(device)
+
+#         pred = model(xx)
+#         pred = u_normalizer.decode(pred)
+#         loss = residual_loss(pred).pow(2).mean()
+#         # loss = (pred-yy).pow(2).mean()
+#         train_loss += loss
+
+#     train_loss.backward()
+#     optimizer.step()
+    
+#     #Validation - L2 Error 
+#     with torch.no_grad():
+#         for xx, yy in test_loader:
+#             xx = xx.to(device)
+#             yy = yy.to(device)
+#             batch_size = xx.shape[0]
+            
+#             pred = model(xx)
+#             loss = (pred - yy).pow(2).mean()
+#             test_loss += loss
+
+#     t2 = default_timer()
+
+#     train_loss = train_loss.item()
+#     test_loss = test_loss.item()
+
+#     print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
+#     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
+    
+#     scheduler.step()
+
+# train_time = default_timer() - start_time
 
 # %%
 #Saving the Model

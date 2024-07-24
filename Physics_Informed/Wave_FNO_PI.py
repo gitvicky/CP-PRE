@@ -14,7 +14,7 @@ configuration = {"Case": 'Wave',
                  "Epochs": 1000,
                  "Batch Size": 1,
                  "Optimizer": 'Adam',
-                 "Learning Rate": 1e-2,
+                 "Learning Rate": 1e-3,
                  "Scheduler Step": 500,
                  "Scheduler Gamma": 0.9,
                  "Activation": 'GeLU',
@@ -212,6 +212,7 @@ def residual_loss(field):
     return 1e3*D(field)
 
 loss_func = residual_loss
+# loss_func = LpLoss(size_average=False)
     
 # %%
 ####################################
@@ -222,64 +223,84 @@ if device == 'cuda':
 
 
 start_time = default_timer()
-model.train()
 for ep in range(epochs): #Training Loop - Epochwise
 
+    model.train()
     t1 = default_timer()
-    train_loss = 0
-    test_loss = 0 
-    for xx, yy in train_loader:
-        optimizer.zero_grad()
-        xx = xx.to(device)
-        yy = yy.to(device)
-        batch_size = xx.shape[0]
-
-        for t in range(0, T_out, step):
-            im = model(xx)
-            if t == 0:
-                pred = im
-            else:
-                pred = torch.cat((pred, im), -1)
-
-            xx = torch.cat((xx[..., step:], im), dim=-1)
-        
-        pred = u_normalizer.decode(pred)
-        loss = residual_loss(pred).pow(2).mean()
-        # loss = (pred-yy).pow(2).mean()
-        train_loss += loss
-
-    train_loss.backward()
-    optimizer.step()
-    
-    #Validation - L2 Error 
-    with torch.no_grad():
-        for xx, yy in test_loader:
-            xx = xx.to(device)
-            yy = yy.to(device)
-            batch_size = xx.shape[0]
-
-            for t in range(0, T_out, step):
-                im = model(xx)
-                if t == 0:
-                    pred = im
-                else:
-                    pred = torch.cat((pred, im), -1)
-
-                xx = torch.cat((xx[..., step:], im), dim=-1)
-            loss = (pred - yy).pow(2).mean()
-            test_loss += loss
-
+    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
     t2 = default_timer()
 
-    train_loss = train_loss.item()
-    test_loss = test_loss.item()
+    train_loss = train_loss / ntrain / num_vars
+    test_loss = test_loss / ntest / num_vars
 
-    print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
+    print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
     
     scheduler.step()
 
 train_time = default_timer() - start_time
+
+
+
+# start_time = default_timer()
+# model.train()
+# for ep in range(epochs): #Training Loop - Epochwise
+
+#     t1 = default_timer()
+#     train_loss = 0
+#     test_loss = 0 
+#     for xx, yy in train_loader:
+#         optimizer.zero_grad()
+#         xx = xx.to(device)
+#         yy = yy.to(device)
+#         batch_size = xx.shape[0]
+
+#         for t in range(0, T_out, step):
+#             im = model(xx)
+#             if t == 0:
+#                 pred = im
+#             else:
+#                 pred = torch.cat((pred, im), -1)
+
+#             xx = torch.cat((xx[..., step:], im), dim=-1)
+        
+#         pred = u_normalizer.decode(pred)
+#         loss = residual_loss(pred).pow(2).mean()
+#         # loss = (pred-yy).pow(2).mean()
+#         train_loss += loss
+
+#     train_loss.backward()
+#     optimizer.step()
+    
+#     #Validation - L2 Error 
+#     with torch.no_grad():
+#         for xx, yy in test_loader:
+#             xx = xx.to(device)
+#             yy = yy.to(device)
+#             batch_size = xx.shape[0]
+
+#             for t in range(0, T_out, step):
+#                 im = model(xx)
+#                 if t == 0:
+#                     pred = im
+#                 else:
+#                     pred = torch.cat((pred, im), -1)
+
+#                 xx = torch.cat((xx[..., step:], im), dim=-1)
+#             loss = (pred - yy).pow(2).mean()
+#             test_loss += loss
+
+#     t2 = default_timer()
+
+#     train_loss = train_loss.item()
+#     test_loss = test_loss.item()
+
+#     print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
+#     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
+    
+#     scheduler.step()
+
+# train_time = default_timer() - start_time
 
 # %%
 #Saving the Model
