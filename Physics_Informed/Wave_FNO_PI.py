@@ -11,18 +11,18 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 1000,
+                 "Epochs": 10000,
                  "Batch Size": 1,
                  "Optimizer": 'Adam',
-                 "Learning Rate": 1e-3,
+                 "Learning Rate": 1e-2,
                  "Scheduler Step": 500,
                  "Scheduler Gamma": 0.9,
                  "Activation": 'GeLU',
                  "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
                  "T_in": 20,    
-                 "T_out": 60,
-                 "Step": 10,
+                 "T_out": 40,
+                 "Step": 40,
                  "Width_time": 32, 
                  "Width_vars": 0,  
                  "Modes": 8,
@@ -194,11 +194,7 @@ model.to(device)
 run.update_metadata({'Number of Params': int(model.count_params())})
 print("Number of model params : " + str(model.count_params()))
 
-#Setting up the optimizer and scheduler, loss and epochs 
-optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
-epochs = configuration['Epochs']
-
+# %%
 #Defining the physics
 from Utils.ConvOps_2d import *
 dx, dy, dt, c = dx, dy, dt, 0.5
@@ -206,14 +202,98 @@ D_tt = ConvOperator(domain ='t', order=2, device=device)#, scale=alpha)
 D_xx_yy = ConvOperator(domain=('x','y'), order=2, device=device)#, scale=beta)
 D = ConvOperator(device=device) #Additive Kernels
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
+D.kernel.requires_grad = True
 
 def residual_loss(field):
     field = field[:, 0, 1:-1, 1:-1, 1:-1].permute(0, 3, 1, 2) #Taking care of the Boundaries. 
-    return 1e3*D(field)
+    return D(field)
 
-loss_func = residual_loss
-# loss_func = LpLoss(size_average=False)
-    
+# loss_func = residual_loss
+loss_func = LpLoss(size_average=False)
+
+# %%
+#Setting up the optimizer and scheduler, loss and epochs 
+if configuration['Optimizer'] == 'Adam':
+    optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+
+if configuration['Optimizer'] == 'LBFGS':
+    optimizer = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=20, max_eval=None, tolerance_grad=1e-07, tolerance_change=1e-09, history_size=100, line_search_fn=None)
+    #Defining the Closure required to evaluate LBFGS
+    def closure():
+        optimizer.zero_grad()
+        y_out = model(xx)
+        loss = residual_loss(y_out)
+        loss.backward()
+        return loss
+
+epochs = configuration['Epochs']
+
+# %% 
+#Single Loop
+def train_one_epoch_AR():
+    model.train()
+    # t1 = default_timer()
+    train_l2_full = 0
+    for xx, yy in train_loader:
+        loss = 0
+        xx = xx.to(device)
+        yy = yy.to(device)
+        batch_size = xx.shape[0]
+
+        for t in range(0, T_out, step):
+            y = yy[..., t:t + step]
+            im = model(xx)
+
+            if t == 0:
+                pred = im
+            else:
+                pred = torch.cat((pred, im), -1)
+
+            xx = torch.cat((xx[..., step:], im), dim=-1)
+            
+        #PI Loss
+        loss = residual_loss(im).pow(2).mean()
+
+        #LP Loss
+        # loss = loss_func(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1))
+
+        train_l2_full += loss.item()
+
+        if configuration['Optimizer'] == 'LBFGS':
+            optimizer.step(closure)
+
+        elif configuration['Optimizer'] == 'Adam':
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+
+    train_loss = train_l2_full 
+    # train_l2_step = train_l2_step / ntrain / (T_out / step) /num_vars
+
+    # Validation Loop
+    test_loss = 0
+    with torch.no_grad():
+        for xx, yy in test_loader:
+            xx, yy = xx.to(device), yy.to(device)
+
+            for t in range(0, T_out, step):
+                y = yy[..., t:t + step]
+                out = model(xx)
+
+                if t == 0:
+                    pred = out
+                else:
+                    pred = torch.cat((pred, out), -1)
+ 
+                xx = torch.cat((xx[..., step:], out), dim=-1)
+            test_loss += loss_func(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1)).item()
+
+    # t2 = default_timer()
+
+    return train_loss, test_loss #remember to divide the ntrain/ntest and num_vars at the other end before logging.
+
 # %%
 ####################################
 #Training Loop - Residual Losses
@@ -227,7 +307,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss, test_loss = train_one_epoch_AR()
     t2 = default_timer()
 
     train_loss = train_loss / ntrain / num_vars
@@ -236,71 +316,8 @@ for ep in range(epochs): #Training Loop - Epochwise
     print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
     
-    scheduler.step()
 
 train_time = default_timer() - start_time
-
-
-
-# start_time = default_timer()
-# model.train()
-# for ep in range(epochs): #Training Loop - Epochwise
-
-#     t1 = default_timer()
-#     train_loss = 0
-#     test_loss = 0 
-#     for xx, yy in train_loader:
-#         optimizer.zero_grad()
-#         xx = xx.to(device)
-#         yy = yy.to(device)
-#         batch_size = xx.shape[0]
-
-#         for t in range(0, T_out, step):
-#             im = model(xx)
-#             if t == 0:
-#                 pred = im
-#             else:
-#                 pred = torch.cat((pred, im), -1)
-
-#             xx = torch.cat((xx[..., step:], im), dim=-1)
-        
-#         pred = u_normalizer.decode(pred)
-#         loss = residual_loss(pred).pow(2).mean()
-#         # loss = (pred-yy).pow(2).mean()
-#         train_loss += loss
-
-#     train_loss.backward()
-#     optimizer.step()
-    
-#     #Validation - L2 Error 
-#     with torch.no_grad():
-#         for xx, yy in test_loader:
-#             xx = xx.to(device)
-#             yy = yy.to(device)
-#             batch_size = xx.shape[0]
-
-#             for t in range(0, T_out, step):
-#                 im = model(xx)
-#                 if t == 0:
-#                     pred = im
-#                 else:
-#                     pred = torch.cat((pred, im), -1)
-
-#                 xx = torch.cat((xx[..., step:], im), dim=-1)
-#             loss = (pred - yy).pow(2).mean()
-#             test_loss += loss
-
-#     t2 = default_timer()
-
-#     train_loss = train_loss.item()
-#     test_loss = test_loss.item()
-
-#     print(f"Epoch {ep}, Time Taken: {round(t2-t1, 6)}, Train Loss: {round(train_loss, 6)}, Test Loss: {round(test_loss, 6)}")
-#     run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
-    
-#     scheduler.step()
-
-# train_time = default_timer() - start_time
 
 # %%
 #Saving the Model
