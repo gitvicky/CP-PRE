@@ -31,7 +31,7 @@ configuration = {"Case": 'Advection',
                  "Loss Function": 'MSE',
                  "n_train": 100,
                  "n_test": 1000,
-                 "n_cal": 10000,
+                 "n_cal": 1000,
                  "n_pred": 100
                  }
 
@@ -116,14 +116,14 @@ def gen_data(params):
 
 #Generate Initial Conditions
 def gen_ic(params):
-    u_ic_cal = []
+    u_ic = []
     for ii in tqdm(range(len(params))):
         xc = params[ii, 0]
         amp = params[ii, 1]
         sim.initializeU(xc, amp)
-        u_ic_cal.append(sim.u)
+        u_ic.append(sim.u)
 
-    u_ic_cal = np.asarray(u_ic_cal)[:, 1:-2]
+    u_ic = np.asarray(u_ic)[:, 1:-2]
 
     u_in_cal = torch.tensor(u_ic_cal, dtype=torch.float32).unsqueeze(1).unsqueeze(-1)
     return u_in_cal
@@ -198,7 +198,7 @@ def filter_sims_within_bounds(lower_bound, upper_bound, samples, threshold, with
 
 # %% 
 #Define Bounds
-lb = np.asarray([0.1, 50]) #pos, amplitude
+lb = np.asarray([0.5, 50]) #pos, amplitude
 ub = np.asarray([1.0, 200])
 
 #Conv kernels --> Stencils 
@@ -246,17 +246,52 @@ print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
 print()
 
+# %% 
 #Calibration Residuals 
 params = lb + (ub - lb) * lhs(2, configuration['n_cal'])
 u_in_cal = gen_ic(params)
 pred_cal, mse, mae = validation_AR(model, u_in_cal, torch.zeros((u_in_cal.shape[0], u_in_cal.shape[1], u_in_cal.shape[2], T_out)), configuration['Step'], configuration['T_out'])
-pred_cal = pred_cal.permute(0,1,3,2)[:,0]
-uu_cal = pred_cal
+uu_cal = pred_cal.permute(0,1,3,2)[:,0]
 cal_residual = D(uu_cal)
 ncf_scores = np.abs(cal_residual.numpy()) 
 
+## Using the test data for calibration. 
+uu_cal = test_u.permute(0,1,3,2)[:,0]
+cal_residual = D(uu_cal)
+ncf_scores = np.abs(cal_residual.numpy()) 
+
+# %%
+#Prediction Residuals 
+params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
+u_in_pred = gen_ic(params)
+pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
+pred_pred = pred_pred.permute(0,1,3,2)[:,0]
+uu_pred = pred_pred
+pred_residual = D(uu_pred)
+
+#Selection/Rejection
+alpha = 0.1
+threshold = 0.5
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [pred_residual - qhat, pred_residual + qhat]
+
+from Utils.plot_tools import subplots_1d
+x_values = x[1:-1]
+idx = 5
+values = {"Residual": pred_residual[idx][1:-1, 1:-1], 
+          "Lower": prediction_sets[0][idx][1:-1, 1:-1],
+          "Upper": prediction_sets[1][idx][1:-1, 1:-1]
+          }
+
+indices = [2, 3, 6, 7]
+subplots_1d(x_values, values, indices, "CP within the residual space.")
+
+filtered_sims = filter_sims_within_bounds(pred_residual - qhat, pred_residual + qhat, pred_residual.numpy(), threshold=threshold)
+params_filtered = params[filtered_sims]
+print(f'{len(params_filtered)} simulations rejected')
+
 # %% 
-n_iterations = 5
+n_iterations = 0
 epochs = 100
 for ii in range(n_iterations):
 
@@ -270,7 +305,7 @@ for ii in range(n_iterations):
 
     #Selection/Rejection
     alpha = 0.5
-    threshold=0.5
+    threshold = 0.5
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
     filtered_sims = filter_sims_within_bounds(-qhat, qhat, pred_residual.numpy(), threshold=threshold)
 
@@ -294,6 +329,6 @@ for ii in range(n_iterations):
 
 # %% 
 plt.plot(test_mse)
-plt.xlabel('MSE')
-plt.ylabel('Iterations')
+plt.ylabel('MSE')
+plt.xlabel('Iterations')
 # %% 

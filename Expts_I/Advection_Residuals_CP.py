@@ -80,23 +80,23 @@ sim = Advection_1d(Nx, Nt, x_min, x_max, t_end)
 
 n_train = configuration['n_train']
 
-lb = np.asarray([0.1, 0.1]) #pos, velocity
-ub = np.asarray([0.7, 0.7])
+lb = np.asarray([0.5, 50]) #pos, amplitude
+ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_train)
 
 u_sol = []
 for ii in tqdm(range(n_train)):
     xc = params[ii, 0]
-    v = params[ii, 1]
-    x, t, u_soln, u_exact = sim.solve(v, xc)
+    amp = params[ii, 1]
+    x, t, u_soln, u_exact = sim.solve(xc, amp)
     u_sol.append(u_soln)
 
 u_sol = np.asarray(u_sol)
 u_sol = u_sol[:, :, 1:-2]
 x = x[1:-2]
-velocity = params[:,1]
-
+velocity = 1.0
+v = velocity
 # %% 
 u = torch.tensor(u_sol, dtype=torch.float32)
 u = u.permute(0, 2, 1) #only for FNO
@@ -186,22 +186,22 @@ print('Testing Error (MAE) : %.3e' % (mae))
 
 n_cal = configuration['n_cal']
 
-lb = np.asarray([0.7, 0.7]) #pos, velocity
-ub = np.asarray([1.0, 1.0])
+lb = np.asarray([0.5, 50]) #pos, amplitude
+ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_train)
 
 u_sol = []
 for ii in tqdm(range(n_cal)):
     xc = params[ii, 0]
-    v = params[ii, 1]
-    x, t, u_soln, u_exact = sim.solve(v, xc)
+    amp = params[ii, 1]
+    x, t, u_soln, u_exact = sim.solve(xc, amp)
     u_sol.append(u_soln)
 
 u_sol = np.asarray(u_sol)
 u_sol = u_sol[:, :, 1:-2]
 x = x[1:-2]
-velocity = params[:,1]
+velocity = 1.0
 
 u = torch.tensor(u_sol, dtype=torch.float32)
 u = u.permute(0, 2, 1) #only for FNO
@@ -251,22 +251,22 @@ subplots_2d(values, titles)
 
 n_pred = configuration['n_pred']
 
-lb = np.asarray([0.7, 0.7]) #pos, velocity
-ub = np.asarray([1.0, 1.0])
+lb = np.asarray([0.5, 50]) #pos, amplitude
+ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_train)
 
 u_sol = []
 for ii in tqdm(range(n_pred)):
     xc = params[ii, 0]
-    v = params[ii, 1]
-    x, t, u_soln, u_exact = sim.solve(v, xc)
+    amp = params[ii, 1]
+    x, t, u_soln, u_exact = sim.solve(xc, amp)
     u_sol.append(u_soln)
 
 u_sol = np.asarray(u_sol)
 u_sol = u_sol[:, :, 1:-2]
 x = x[1:-2]
-velocity = params[:,1]
+velocity = 1.0
 
 u = torch.tensor(u_sol, dtype=torch.float32)
 u = u.permute(0, 2, 1) #only for FNO

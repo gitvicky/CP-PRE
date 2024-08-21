@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Desc. 
+Uncertainty quantification of a Neural PDE Surrogate solving the Burgers Equation using Physics Residuals 
+and guaranteed using Conformal Prediction. Prediction Selection/Rejection based on CP bounds. 
 
-u_t + u*u_x =  nu*u_xx on [0,2]
+Eqn:   u_t + u*u_x =  nu*u_xx on [0,2]
 
 """
 
@@ -18,19 +19,20 @@ configuration = {"Case": 'Burgers',
                  "Scheduler Step": 100,
                  "Scheduler Gamma": 0.5,
                  "Activation": 'Tanh',
-                 "Normalisation Strategy": 'Identity',
-                 "T_in": 20,    
+                 "Normalisation Strategy": 'Min-Max',
+                 "T_in": 1,    
                  "T_out": 30,
-                 "Step": 30,
+                 "Step": 1,
                  "Width": 32, 
                  "Modes": 8,
                  "Variables":1, 
                  "Noise":0.0, 
                  "Loss Function": 'MSE',
-                 "n_cal": 100,
+                 "n_train": 100,
+                 "n_test": 1000,
+                 "n_cal": 1000,
                  "n_pred": 100
                  }
-
 # %% 
 #Importing the necessary packages
 import os 
@@ -38,7 +40,6 @@ import sys
 import numpy as np
 from tqdm import tqdm 
 import torch
-import torch.nn.functional as F
 import matplotlib
 import matplotlib.pyplot as plt
 import time 
@@ -52,10 +53,9 @@ sys.path.append("..")
 from Neural_PDE.Models.FNO import *
 from Neural_PDE.Utils.processing_utils import * 
 from Neural_PDE.Utils.training_utils import * 
-
+from Neural_PDE.UQ.inductive_cp import * 
 from Utils.plot_tools import subplots_2d
 
-# %% 
 #Setting up locations. 
 file_loc = os.getcwd()
 # data_loc = file_loc + '/Data'
@@ -65,10 +65,10 @@ plot_loc = file_loc + '/Plots'
 torch.manual_seed(0)
 np.random.seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.set_default_dtype(torch.float32)
 
 # %% 
 # Generating calibration data
-n_cal = configuration['n_cal']
 from pyDOE import lhs
 from Neural_PDE.Numerical_Solvers.Burgers.Burgers_1D import * 
 
@@ -80,10 +80,64 @@ t_end = 1.25 #Time Maximum
 nu = 0.002
 x_slice = 5
 t_slice = 10
-
 # x_slice, t_slice = 1, 1
 # alpha, beta, gamma = 1.0, 1.0, 1.0
+sim = Burgers_1D(Nx, Nt, x_min, x_max, t_end, nu) 
+dt, dx = sim.dt, sim.dx
 
+# %% 
+# Utility Functions 
+
+def gen_data(params):
+    #Generating Data 
+    u_sol = []
+    for ii in tqdm(range(len(params))):
+        sim.InitializeU(params[ii,0], params[ii,1], params[ii,2])
+        u_soln, x, dt = sim.solve()
+        u_sol.append(u_soln)
+
+    #Extraction
+    u_sol = np.asarray(u_sol)[:, ::t_slice, ::x_slice]
+    x = x[::x_slice]
+    dt = dt*t_slice
+
+    #Tensorize
+    u = torch.tensor(u_sol, dtype=torch.float32)
+    u = u.permute(0, 2, 1) #Adding BS and Permuting for FNO
+    u = u.unsqueeze(1) #Adding the variable channel
+
+
+#Generate Initial Conditions
+def gen_ic(params):
+    u_ic = []
+    for ii in tqdm(range(len(params))):
+        sim.InitializeU(params[ii,0], params[ii,1], params[ii,2])
+        u_ic.append(sim.u0)
+
+    u_ic = np.asarray(u_ic[::x_slice])
+    u_ic = torch.tensor(u_ic, dtype=torch.float32).unsqueeze(1).unsqueeze(-1)
+    return u_ic
+
+#Load Simulation data into Dataloader
+def data_loader(uu, dataloader=True, shuffle=True):
+
+    a = uu[:, :, :, :configuration['T_in']]
+    u = uu[:, :, :, configuration['T_in']:configuration['T_out']+configuration['T_in']]
+
+    # print("Input: " + str(a.shape))
+    # print("Output: " + str(u.shape))
+
+    #No Normalisation -- Normalisation = Identity 
+
+    if dataloader:
+        loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(a, u), batch_size=configuration['Batch Size'], shuffle=shuffle)
+    else:
+        loader = [a,u]
+
+    return loader
+
+# %% 
+# Define Bounds
 lb = np.asarray([3, 3, 3]) # Lower Bound of the parameter domain
 ub = np.asarray([5, 5, 5]) # Upper bound of the parameter domain
 
@@ -147,8 +201,8 @@ indices = [6, 12, 18, 24]
 subplots_1d(x, values, indices, "Comparing Model Prediction")
 # %% 
 #Estimating the Residuals of the calibration
-# uu = pred #Prediction
-uu = u_out #Solution
+uu = pred #Prediction
+# uu = u_out #Solution
 
 uu = uu.permute(0,1,3,2)
 uu = uu[:, 0]
@@ -173,7 +227,7 @@ cal_residual  = dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
 #Plotting
 idx = 0
 x_values = x
-y_values = {"Prediction": cal_residual[idx]
+y_values = {"Prediction": cal_residual[idx][1:-1]
           }
 indices = [6, 12, 18, 24]
 subplots_1d(x_values, y_values, indices, "Residuals")
@@ -207,8 +261,8 @@ pred, mse, mae = validation_AR(model, u_in, u_out, configuration['Step'], config
  # %% 
  #Estimating the residuals for the Prediction
 
-# uu = pred #Prediction
-uu = u_out #Solution
+uu = pred #Prediction
+# uu = u_out #Solution
 
 uu = uu.permute(0,1,3,2)
 uu = uu[:, 0]

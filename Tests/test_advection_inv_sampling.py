@@ -82,8 +82,8 @@ sim = Advection_1d(Nx, Nt, x_min, x_max, t_end)
 
 n_train = configuration['n_train']
 
-lb = np.asarray([0.1, 0.1]) #pos, velocity
-ub = np.asarray([1.0, 1.0])
+lb = np.asarray([0.5, 50]) #pos, amplitude
+ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_train)
 
@@ -187,7 +187,7 @@ print('Testing Error (MAE) : %.3e' % (mae))
 
 n_cal = configuration['n_cal']
 
-lb = np.asarray([0.7, 50]) #pos, amp
+lb = np.asarray([0.5, 50]) #pos, amplitude
 ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_cal)
@@ -258,8 +258,8 @@ qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 
 n_pred = configuration['n_pred']
 
-lb = np.asarray([0.5, 0.5]) #pos, velocity
-ub = np.asarray([1.0, 1.0])
+lb = np.asarray([0.5, 50]) #pos, amplitude
+ub = np.asarray([1.0, 200])
 
 params = lb + (ub - lb) * lhs(2, n_pred)
 
