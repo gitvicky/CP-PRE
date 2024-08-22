@@ -238,8 +238,8 @@ pred_residual = residual(pred_pred)
 
 # %% 
 #Selection/Rejection
-alpha = 0.5
-threshold = 0.5
+alpha = 0.9
+threshold = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets = [pred_residual - qhat, pred_residual + qhat]
 
@@ -247,4 +247,21 @@ filtered_sims = filter_sims_within_bounds(prediction_sets[0], prediction_sets[1]
 params_filtered = params[filtered_sims]
 print(f'{len(params_filtered)} simulations rejected')
 
+# %%
+#Plotting the fields, prediction, abs error and the residual
+idx = 0
+t_idx = 10
+values = [pred_pred[idx,t_idx],
+          pred_residual[idx,t_idx],
+          prediction_sets[0][idx,t_idx],
+          prediction_sets[1][idx,t_idx]
+          ]
+
+titles = [r'$\tilde u$',
+          r'$D(\tilde u)$',
+          r'$D(\tilde u) + \hat q$',
+          r'$D(\tilde u) - \hat q$'
+          ]
+
+subplots_2d(values, titles)
 # %%
