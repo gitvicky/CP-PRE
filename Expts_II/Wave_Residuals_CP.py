@@ -93,7 +93,7 @@ def gen_data(params):
     #Generating Data 
     u_sol = []
     for ii in tqdm(range(len(params))):
-        x, y, t, u_sol = sim.solve()
+        x, y, t, u_soln = sim.solve()
         u_sol.append(u_soln)
 
     #Extraction
@@ -187,7 +187,7 @@ model.load_state_dict(torch.load(model_loc + '/FNO_Wave_contemporary-cockatoo.pt
 data_loc = os.path.dirname(os.getcwd()) + '/Neural_PDE/Data'
 data =  np.load(data_loc + '/Spectral_Wave_data_LHS.npz')
 
-u_sol  = data['u'][:100]
+u_sol  = data['u']
 x = data['x']
 y = data['y']
 t = data['t']
@@ -200,7 +200,7 @@ u = u.unsqueeze(1) #Adding the variable channel
 norms = np.load(model_loc + '/FNO_Wave_contemporary-cockatoo_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
-cal_in, cal_out = data_loader(u, configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+cal_in, cal_out = data_loader(u[:100], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step'], configuration['T_out'])
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
@@ -227,8 +227,34 @@ titles = [r'$u$',
           ]
 
 subplots_2d(values, titles)
+
 # %% 
-#Prediction Residuals 
+#Checking for coverage from a portion of the avilable data
+pred_in, pred_out = data_loader(u[-100:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+pred_pred, mse, mae = validation_AR(model, pred_in, pred_out, configuration['Step'], configuration['T_out'])
+pred_out = out_normalizer.decode(pred_out)
+pred_pred = out_normalizer.decode(pred_pred)
+
+pred_residual = residual(pred_pred.permute(0,1,4,2,3)[:,0]) #Prediction
+val_residual = residual(pred_out.permute(0,1,4,2,3)[:,0]) #Data
+
+#Emprical Coverage for all values of alpha 
+alpha_levels = np.arange(0.05, 0.95, 0.1)
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+
+# %% 
+#Prediction Residuals from IC sampling within the Bounds. 
 params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
 u_in_pred = gen_ic(params)
 pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], u_in_pred.shape[3], configuration['T_out'])), configuration['Step'], configuration['T_out'])

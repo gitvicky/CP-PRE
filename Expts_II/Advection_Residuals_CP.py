@@ -235,7 +235,7 @@ pred_residual = D(uu_pred)
 
 #Selection/Rejection
 alpha = 0.1
-threshold = 0.5
+threshold = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets = [pred_residual - qhat, pred_residual + qhat]
 

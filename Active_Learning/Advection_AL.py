@@ -123,7 +123,7 @@ def gen_ic(params):
         sim.initializeU(xc, amp)
         u_ic.append(sim.u)
 
-    u_ic = np.asarray(u_ic)[:, 1:-2]
+    u_ic_cal = np.asarray(u_ic)[:, 1:-2]
 
     u_in_cal = torch.tensor(u_ic_cal, dtype=torch.float32).unsqueeze(1).unsqueeze(-1)
     return u_in_cal
@@ -255,10 +255,10 @@ uu_cal = pred_cal.permute(0,1,3,2)[:,0]
 cal_residual = D(uu_cal)
 ncf_scores = np.abs(cal_residual.numpy()) 
 
-## Using the test data for calibration. 
-uu_cal = test_u.permute(0,1,3,2)[:,0]
-cal_residual = D(uu_cal)
-ncf_scores = np.abs(cal_residual.numpy()) 
+# ## Using the test data for calibration. 
+# uu_cal = test_u.permute(0,1,3,2)[:,0]
+# cal_residual = D(uu_cal)
+# ncf_scores = np.abs(cal_residual.numpy()) 
 
 # %%
 #Prediction Residuals 
@@ -270,7 +270,7 @@ uu_pred = pred_pred
 pred_residual = D(uu_pred)
 
 #Selection/Rejection
-alpha = 0.1
+alpha = 0.5
 threshold = 0.5
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets = [pred_residual - qhat, pred_residual + qhat]
@@ -286,12 +286,12 @@ values = {"Residual": pred_residual[idx][1:-1, 1:-1],
 indices = [2, 3, 6, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
 
-filtered_sims = filter_sims_within_bounds(pred_residual - qhat, pred_residual + qhat, pred_residual.numpy(), threshold=threshold)
+filtered_sims = filter_sims_within_bounds(-qhat, qhat, pred_residual.numpy(), threshold=threshold)
 params_filtered = params[filtered_sims]
 print(f'{len(params_filtered)} simulations rejected')
 
 # %% 
-n_iterations = 0
+n_iterations = 5
 epochs = 100
 for ii in range(n_iterations):
 
@@ -328,7 +328,7 @@ for ii in range(n_iterations):
     print()
 
 # %% 
-plt.plot(test_mse)
+plt.plot(test_mse[4:])
 plt.ylabel('MSE')
 plt.xlabel('Iterations')
 # %% 
