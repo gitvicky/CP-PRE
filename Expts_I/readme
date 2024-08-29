@@ -1,0 +1,4 @@
+This folder contains the initial experiments in evaluating the CP framework within the Residual Space. 
+The experiments were mainly characterised by an FNO/U-Net that models single-pred/AR manner the evolution of a PDE. 
+Across the range of experiments had varing T_in, step and T_out. With the calibration and prediction obtained from previously saved datasets. 
+Residuals are estimated using FD Stencils as Conv. Kernels. 

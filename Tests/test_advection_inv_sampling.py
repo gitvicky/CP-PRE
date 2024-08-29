@@ -298,11 +298,11 @@ pred_residual = D(uu_pred)
 # %% 
 from Utils.plot_tools import subplots_1d
 
-x_values = x
+x_values = x[1:-1]
 values = {
-          "Lower": -qhat,
-          "Upper": qhat,
-          "pred_residual": pred_residual[5]
+          "Lower": -qhat[1:-1,1:-1],
+          "Upper": qhat[1:-1,1:-1],
+          "pred_residual": pred_residual[5][1:-1,1:-1]
           }
 
 indices = [6, 12, 18, 24]
@@ -359,7 +359,6 @@ selected_samples = sampling_residual_np[filtered_samples]
 uu_selected = uu_pred[filtered_samples]
 
 # %% 
-
 
 # ############################ Marginal - Ander's version #####################
 
@@ -502,6 +501,3 @@ plt.legend()
 # indices = [6, 12, 18, 24]
 # subplots_1d(x_values, values, indices, "CP within the Physical space - hopefully.")
 
-# # %%
-
-# %%

@@ -211,8 +211,8 @@ cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step']
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
 
-cal_residual = residual(cal_pred.permute(0,1,3,2)[:,0]) #Physics-Driven
-# cal_residual = residual(cal_out.permute(0,1,3,2)[:,0]) #Data-Driven
+# cal_residual = residual(cal_pred.permute(0,1,3,2)[:,0]) #Physics-Driven
+cal_residual = residual(cal_out.permute(0,1,3,2)[:,0]) #Data-Driven
 ncf_scores = np.abs(cal_residual.numpy())
 
 # %% 
@@ -271,17 +271,17 @@ pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 pred_residual = residual(pred_pred)
 
 #Selection/Rejection
-alpha = 0.9
-threshold = 0.01
+alpha = 0.1
+threshold = 0.9
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [pred_residual - qhat, pred_residual + qhat]
+prediction_sets = [ - qhat,  + qhat]
 
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 40
 values = {"Residual": pred_residual[idx][1:-1, 1:-1], 
-          "Lower": prediction_sets[0][idx][1:-1, 1:-1],
-          "Upper": prediction_sets[1][idx][1:-1, 1:-1]
+          "Lower": prediction_sets[0][1:-1, 1:-1],
+          "Upper": prediction_sets[1][1:-1, 1:-1]
           }
 
 indices = [5, 10, 15, 20]

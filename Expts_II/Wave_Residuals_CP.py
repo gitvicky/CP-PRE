@@ -12,7 +12,7 @@ c = 1.00
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 250,
+                 "Epochs": 500,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -22,11 +22,11 @@ configuration = {"Case": 'Wave',
                  "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
                  "T_in": 1,    
-                 "T_out": 60,
+                 "T_out": 20,
                  "Step": 1,
                  "Width_time": 32, 
                  "Width_vars": 0,  
-                 "Modes": 8,
+                 "Modes": 16,
                  "Variables":1, 
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
@@ -179,7 +179,7 @@ residual = D
 model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
 model.to(device)
 print("Number of model params : " + str(model.count_params()))
-model.load_state_dict(torch.load(model_loc + '/FNO_Wave_contemporary-cockatoo.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_Wave_cyclic-muntin.pth', map_location='cpu'))
 
 # %% 
 ################################################################
@@ -197,7 +197,7 @@ u = u.permute(0, 2, 3, 1) #Adding BS and Permuting for FNO
 u = u.unsqueeze(1) #Adding the variable channel
 
 #Setting up the normalisation. 
-norms = np.load(model_loc + '/FNO_Wave_contemporary-cockatoo_norms.npz')
+norms = np.load(model_loc + '/FNO_Wave_cyclic-muntin_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
 cal_in, cal_out = data_loader(u[:100], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
@@ -205,14 +205,14 @@ cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step']
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
 
-cal_residual = residual(cal_pred.permute(0,1,4,2,3)[:,0]) #Physics-Driven
-# cal_residual = residual(cal_out.permute(0,1,4,2,3)[:,0]) #Data-Driven
+# cal_residual = residual(cal_pred.permute(0,1,4,2,3)[:,0]) #Physics-Driven
+cal_residual = residual(cal_out.permute(0,1,4,2,3)[:,0]) #Data-Driven
 ncf_scores = np.abs(cal_residual.numpy())
 
 # %% 
 
 #Plotting the fields, prediction, abs error and the residual
-idx = 0
+idx = 5
 t_idx = 10
 values = [cal_out[0, 0,...,t_idx],
           cal_pred[0,0,...,t_idx],
@@ -264,10 +264,10 @@ pred_residual = residual(pred_pred)
 
 # %% 
 #Selection/Rejection
-alpha = 0.9
-threshold = 0.1
+alpha = 0.5
+threshold = 0.9
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [pred_residual - qhat, pred_residual + qhat]
+prediction_sets = [- qhat, + qhat]
 
 filtered_sims = filter_sims_within_bounds(prediction_sets[0], prediction_sets[1], pred_residual.numpy(), threshold=threshold)
 params_filtered = params[filtered_sims]
@@ -275,18 +275,18 @@ print(f'{len(params_filtered)} simulations rejected')
 
 # %%
 #Plotting the fields, prediction, abs error and the residual
-idx = 0
+idx = 5
 t_idx = 10
 values = [pred_pred[idx,t_idx],
           pred_residual[idx,t_idx],
-          prediction_sets[0][idx,t_idx],
-          prediction_sets[1][idx,t_idx]
+          prediction_sets[0][t_idx],
+          prediction_sets[1][t_idx]
           ]
 
 titles = [r'$\tilde u$',
           r'$D(\tilde u)$',
-          r'$D(\tilde u) + \hat q$',
-          r'$D(\tilde u) - \hat q$'
+          r'$- \hat q$',
+          r'$+ \hat q$'
           ]
 
 subplots_2d(values, titles)
