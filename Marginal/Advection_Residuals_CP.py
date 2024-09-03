@@ -227,8 +227,8 @@ x, t, u_sol = gen_data(params)
 u_in_cal, u_out_cal = data_loader(u_sol, dataloader=False, shuffle=False)
 u_pred_cal, mse, mae = validation_AR(model, u_in_cal, u_out_cal, step, T_out)
 
-residual_out_cal = D(u_out_cal.permute(0,1,3,2)[:,0])[1:-1, 1:-1]
-residual_pred_cal = D(u_pred_cal.permute(0,1,3,2)[:,0])[1:-1, 1:-1]
+residual_out_cal = D(u_out_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
+residual_pred_cal = D(u_pred_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
 
 ncf_scores = np.abs(residual_out_cal - residual_pred_cal) #AER + PRE
 # %%
@@ -238,7 +238,7 @@ u_in_pred = gen_ic(params)
 pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
 pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 uu_pred = pred_pred
-pred_residual = D(uu_pred)[1:-1, 1:-1]
+pred_residual = D(uu_pred)[...,1:-1, 1:-1]
 
 # %% 
 #Plotting Coverage
@@ -249,9 +249,9 @@ prediction_sets =  [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 5
-values = {"Residual": pred_residual[idx][1:-1, 1:-1], 
-          "Lower": prediction_sets[0][idx][1:-1, 1:-1],
-          "Upper": prediction_sets[1][idx][1:-1, 1:-1]
+values = {"Residual": pred_residual[idx], 
+          "Lower": prediction_sets[0][idx],
+          "Upper": prediction_sets[1][idx]
           }
 
 indices = [2, 3, 4, 5]
@@ -261,15 +261,15 @@ subplots_1d(x_values, values, indices, "CP within the residual space.")
 #Checking for Coverage
 pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
 
-test_val_residual = D(test_u.permute(0,1,3,2)[:,0])[1:-1, 1:-1]
-test_pred_residual = D(pred_test.permute(0,1,3,2)[:,0])[1:-1, 1:-1]
+test_val_residual = D(test_u.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
+test_pred_residual = D(pred_test.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
 
 #Emprical Coverage for all values of alpha 
 alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    prediction_sets = [test_pred_residual.numpy() - qhat, test_pred_residual.numpy() + qhat]
     emp_cov_res.append(emp_cov(prediction_sets, test_val_residual.numpy()))
 
 plt.figure()
@@ -289,10 +289,10 @@ from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 5
 values = {
-        "Pred. Residual": test_pred_residual[idx][1:-1, 1:-1], 
-          "Val. Residual": test_val_residual[idx][1:-1, 1:-1], 
-          "Lower": prediction_sets[0][idx][1:-1, 1:-1],
-          "Upper": prediction_sets[1][idx][1:-1, 1:-1]
+        "Pred. Residual": test_pred_residual[idx], 
+          "Val. Residual": test_val_residual[idx], 
+          "Lower": prediction_sets[0][idx],
+          "Upper": prediction_sets[1][idx]
           }
 
 indices = [2, 3, 4, 5]
@@ -301,8 +301,8 @@ subplots_1d(x_values, values, indices, "CP within the residual space.")
 #%%
 ###################################################################
 #Filtering Sims -- using PRE only 
-ncf_scores = np.abs(residual_out_cal) #Data-Driven
-# ncf_scores = np.abs(residual_pred_cal) #Physics-Driven
+# ncf_scores = np.abs(residual_out_cal) #Data-Driven
+ncf_scores = np.abs(residual_pred_cal) #Physics-Driven
 ###################################################################
 
 #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
@@ -322,20 +322,20 @@ plt.legend()
 
 # %%
 #Selection/Rejection
-alpha = 0.1
-threshold = 0.9
+alpha = 0.5
+threshold = 0.5
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets = [- qhat,  + qhat]
 
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 40
-values = {"Residual": pred_residual[idx][1:-1, 1:-1], 
-          "Lower": prediction_sets[0][1:-1, 1:-1],
-          "Upper": prediction_sets[1][1:-1, 1:-1]
+values = {"Residual": pred_residual[idx], 
+          "Lower": prediction_sets[0],
+          "Upper": prediction_sets[1]
           }
 
-indices = [5, 10, 15, 20]
+indices = [1, 3, 5, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
 
 filtered_sims = filter_sims_within_bounds(prediction_sets[0], prediction_sets[1], pred_residual.numpy(), threshold=threshold)
