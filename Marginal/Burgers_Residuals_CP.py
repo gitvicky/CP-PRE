@@ -182,7 +182,6 @@ nu = torch.tensor(nu, dtype=torch.float32)
 def residual(uu):
     return dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
 
-
 #Loading the Model  
 model = FNO_multi1d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Variables'], configuration['Width'], width_vars=0)
 model.to(device)
@@ -237,7 +236,7 @@ indices = [5, 10, 15, 20]
 subplots_1d(x_values, values, indices, "Residual Comparison")
 
 # %% 
-#Checking for coverage from a portion of the avilable data
+#Checking for coverage from a portion of the available data
 pred_in, pred_out = data_loader(u[500:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 pred_pred, mse, mae = validation_AR(model, pred_in, pred_out, configuration['Step'], configuration['T_out'])
 pred_out = out_normalizer.decode(pred_out)
@@ -251,7 +250,7 @@ alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    prediction_sets = [- qhat, + qhat]
     emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
@@ -274,7 +273,7 @@ pred_residual = residual(pred_pred)
 alpha = 0.1
 threshold = 0.9
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [ - qhat,  + qhat]
+prediction_sets = [- qhat,  + qhat]
 
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]

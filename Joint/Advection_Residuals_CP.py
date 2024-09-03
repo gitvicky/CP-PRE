@@ -246,7 +246,7 @@ qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets =  [pred_residual - qhat*modulation, pred_residual + qhat*modulation]
 
 from Utils.plot_tools import subplots_1d
-x_values = x[1:-1]
+x_values = x#[1:-1]
 idx = 5
 values = {"Residual": pred_residual[idx],#[1:-1, 1:-1], 
           "Lower": prediction_sets[0][idx],#[1:-1, 1:-1],
@@ -305,12 +305,12 @@ def filter_sims_within_bounds(prediction_sets, y_response):
     axes = tuple(np.arange(1,len(y_response.shape)))
     return ((y_response >= prediction_sets[0]).all(axis = axes) & (y_response <= prediction_sets[1]).all(axis = axes))
 
-alpha = 0.5
+alpha = 0.1
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [test_pred_residual.numpy() - qhat*modulation, test_pred_residual.numpy() + qhat*modulation]
-filtered_sims = filter_sims_within_bounds(prediction_sets, test_val_residual.numpy())
+prediction_sets =  [- qhat*modulation, + qhat*modulation]
+filtered_sims = filter_sims_within_bounds(prediction_sets, test_pred_residual.numpy())
 print(filtered_sims)
 # params_filtered = params[filtered_sims]
-# print(f'{len(params_filtered)} simulations rejected')
+print(f'{sum(filtered_sims)} simulations rejected')
 
 # %%
