@@ -113,16 +113,14 @@ def unstack_fields(field, axis, variable_names):
 #Running the simulations. 
 def gen_data(params):
     #Generating Data 
-    uu = []
-    vv = []
-    pp = []
+    uu, vv, pp = [], [], []
 
     for ii in tqdm(range(len(params))):
         sim = Navier_Stokes_2d(N, tStart, tEnd, dt, nu, L, params[ii,0], params[ii,1])
         u, v, p, w, x, t, err = sim.solve()
         uu.append(u)
         vv.append(v)
-        pp.append(w)
+        pp.append(p)
 
     #Extraction
     t_slice = 10 
@@ -360,3 +358,20 @@ filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
 print(filtered_sims)
 print(f'{sum(filtered_sims)} simulations rejected')
 
+# %% 
+
+#Plotting the error bars. 
+idx = 5
+t_idx = 10
+values = [
+          prediction_sets[0][t_idx],
+          prediction_sets[1][t_idx]
+          ]
+
+titles = [
+          r'$- \hat q \times mod$',
+          r'$+ \hat q \times mod$'
+          ]
+
+subplots_2d(values, titles)
+# %%

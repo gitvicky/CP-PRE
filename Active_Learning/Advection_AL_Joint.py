@@ -14,7 +14,7 @@ configuration = {"Case": 'Advection',
                  "Field": 'u',
                  "Model": 'FNO',
                  "Epochs": 100,
-                 "Batch Size": 10,
+                 "Batch Size": 100,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.001,
                  "Scheduler Step": 100,
@@ -29,7 +29,7 @@ configuration = {"Case": 'Advection',
                  "Variables":1, 
                  "Noise":0.0, 
                  "Loss Function": 'MSE',
-                 "n_train": 100,
+                 "n_train": 500,
                  "n_test": 1000,
                  "n_cal": 100,
                  "n_pred": 100
@@ -145,6 +145,25 @@ def data_loader(uu, dataloader=True, shuffle=True):
 
     return loader
 
+
+def train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler):
+    ####################################
+    #Training Loop 
+    ####################################
+    for ep in range(epochs): #Training Loop - Epochwise
+
+        model.train()
+        t1 = default_timer()
+        train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+        t2 = default_timer()
+
+        # train_loss = train_loss / ntrain / num_vars
+        # test_loss = test_loss / ntest / num_vars
+
+        print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
+        
+        scheduler.step()
+    return model 
 # %% 
 #Define Bounds
 lb = np.asarray([0.5, 50]) #pos, amplitude
@@ -163,9 +182,9 @@ D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
 ################################################################
 #Train Data
 params = lb + (ub - lb) * lhs(2, configuration['n_train'])
-x, t, u_sol = gen_data(params)
-train_loader = data_loader(u_sol)
-test_loader = data_loader(u_sol[-10:]) #Just kept to hefty evaluations each epoch. 
+x, t, u_sol_train = gen_data(params)
+train_loader = data_loader(u_sol_train)
+test_loader = data_loader(u_sol_train[-10:]) #Just kept to hefty evaluations each epoch. 
 
 #Test Data
 params = lb + (ub - lb) * lhs(2, configuration['n_test'])
@@ -184,24 +203,11 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['
 loss_func = torch.nn.MSELoss()
 epochs = configuration['Epochs']
 
+#Training
 start_time = default_timer()
-####################################
-#Training Loop 
-####################################
-for ep in range(epochs): #Training Loop - Epochwise
+model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
+train_time = default_timer() - start_time
 
-    model.train()
-    t1 = default_timer()
-    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
-    t2 = default_timer()
-
-    # train_loss = train_loss / ntrain / num_vars
-    # test_loss = test_loss / ntest / num_vars
-
-    print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
-    
-    scheduler.step()
-    train_time = default_timer() - start_time
 
 #Evaluation
 pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
@@ -211,13 +217,6 @@ print('Testing Error (MAE) : %.3e' % (mae))
 print()
 
 # %% 
-# #Calibration Residuals with just prediction data
-# params = lb + (ub - lb) * lhs(2, configuration['n_cal'])
-# u_in_cal = gen_ic(params)
-# pred_cal, mse, mae = validation_AR(model, u_in_cal, torch.zeros((u_in_cal.shape[0], u_in_cal.shape[1], u_in_cal.shape[2], T_out)), configuration['Step'], configuration['T_out'])
-# uu_cal = pred_cal.permute(0,1,3,2)[:,0]
-# cal_residual = D(uu_cal)
-# ncf_scores = np.abs(cal_residual.numpy()) 
 
 ## Using Calibration Data from smaller sample of simulations
 params = lb + (ub - lb) * lhs(2, configuration['n_cal'])
@@ -227,8 +226,6 @@ u_pred_cal, mse, mae = validation_AR(model, u_in_cal, u_out_cal, step, T_out)
 
 residual_out_cal = D(u_out_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
 residual_pred_cal = D(u_pred_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
-modulation = modulation_func(residual_out_cal.numpy(), residual_pred_cal.numpy())
-ncf_scores = ncf_metric_joint(residual_pred_cal.numpy(), residual_out_cal.numpy(), modulation)
 
 # %%
 #Prediction Residuals 
@@ -239,67 +236,7 @@ pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 uu_pred = pred_pred
 pred_residual = D(uu_pred)[...,1:-1, 1:-1]
 
-# %% 
-#Plotting Coverage
-alpha = 0.1
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [pred_residual - qhat*modulation, pred_residual + qhat*modulation]
 
-from Utils.plot_tools import subplots_1d
-x_values = x[1:-1]
-idx = 5
-values = {"Residual": pred_residual[idx],
-          "Lower": prediction_sets[0][idx],
-          "Upper": prediction_sets[1][idx]
-          }
-
-indices = [2, 3, 6, 7]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
-
-
-# %% 
-#Checking for Coverage
-pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
-
-test_val_residual = D(test_u.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
-test_pred_residual = D(pred_test.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
-
-#Emprical Coverage for all values of alpha 
-alpha_levels = np.arange(0.05, 0.95, 0.1)
-emp_cov_res = []
-for alpha in tqdm(alpha_levels):
-    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [test_pred_residual.numpy() - qhat*modulation, test_pred_residual.numpy() + qhat*modulation]
-    emp_cov_res.append(emp_cov_joint(prediction_sets, test_val_residual.numpy()))
-
-plt.figure()
-plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
-plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
-plt.xlabel('1-alpha')
-plt.ylabel('Empirical Coverage')
-plt.legend()
-
-# %% 
-#Plotting Coverage
-alpha = 0.1
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [test_pred_residual.numpy() - qhat*modulation, test_pred_residual.numpy() + qhat*modulation]
-
-from Utils.plot_tools import subplots_1d
-x_values = x[1:-1]
-idx = 5
-values = {"Pred. Residual": test_pred_residual[idx], 
-          "Val. Residual": test_val_residual[idx], 
-          "Lower": prediction_sets[0][idx],
-          "Upper": prediction_sets[1][idx]
-          }
-
-indices = [2, 3, 4, 5]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
-
-#%%
-###################################################################
-#Filtering Sims -- using PRE only 
 # res = residual_out_cal #Data-Driven
 res = residual_pred_cal #Physics-Driven
 
@@ -323,34 +260,73 @@ plt.legend()
 
 # %% 
 ###################################################################
-#Filtering Sims
-
+#Filtering Sims using CP. 
 def filter_sims_joint(prediction_sets, y_response):
     axes = tuple(np.arange(1,len(y_response.shape)))
     return ((y_response >= prediction_sets[0]).all(axis = axes) & (y_response <= prediction_sets[1]).all(axis = axes))
 
-alpha = 0.5
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [- qhat*modulation, + qhat*modulation]
-filtered_sims = filter_sims_joint(prediction_sets, test_pred_residual.numpy())
-print(filtered_sims)
-print(f'{sum(filtered_sims)} simulations rejected')
 
 # %%
-#Plotting Coverage
-alpha = 0.1
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [- qhat*modulation, + qhat*modulation]
+#Active Learning Pipeline
 
-from Utils.plot_tools import subplots_1d
-x_values = x[1:-1]
-idx = 5
-values = {"Residual": pred_residual[idx],
-          "Lower": prediction_sets[0],
-          "Upper": prediction_sets[1]
-          }
+n_iterations = 5
+epochs = 100
+acq_func = 'CP' #CP, PRE, RAND
+alpha = 0.5 #CP-alpha 
 
-indices = [2, 3, 6, 7]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
+for ii in range(n_iterations):
 
-# %%
+    #Prediction Residuals 
+    params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
+    u_in_pred = gen_ic(params)
+    pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
+    pred_pred = pred_pred.permute(0,1,3,2)[:,0]
+    uu_pred = pred_pred
+    pred_residual = D(uu_pred)[...,1:-1, 1:-1]
+
+    if acq_func == 'CP':
+    #Selection/Rejection using Joint CP
+        qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+        prediction_sets =  [- qhat*modulation, + qhat*modulation]
+        filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
+        params_filtered = params[filtered_sims]
+        print(f'{len(params_filtered)} predictions rejected')
+
+    if acq_func == 'PRE':
+    #Selection/Rejection using Descending order of PRE
+        pred_residual_mean = torch.mean(pred_residual, axis=tuple(range(1, pred_residual.ndim)))
+        pred_residual_mean_sorted, sort_index = torch.sort(pred_residual_mean)
+        num_sims = (1-alpha)*configuration['n_pred']
+        params_filtered = params[sort_index][:num_sims]
+        print(f'{len(params_filtered)} predictions rejected')
+
+    if acq_func == 'RAND':
+    #Random Selection
+        num_sims = (1-alpha)*configuration['n_pred']
+        random_index = np.random.randint(0, num_sims)
+        params_filtered = params[random_index]
+        print(f'{len(params_filtered)} predictions rejected')
+
+
+    #Numerical Sim over the Rejected Predictions and adding to training data.
+    x, t, u_sol = gen_data(params_filtered)
+    u_sol_train = torch.stack(u_sol_train, u_sol)
+    train_loader = data_loader(u_sol_train)
+
+    #Fine-tuning with the Sampled Sims. 
+    start_time = default_timer()
+    model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
+    train_time = default_timer() - start_time
+
+    #Evaluation
+    pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
+    test_mse.append(mse)
+    print('Testing Error (MSE) : %.3e' % (mse))
+    print('Testing Error (MAE) : %.3e' % (mae))
+    print()
+
+# %% 
+plt.plot(test_mse)
+plt.ylabel('MSE')
+plt.xlabel('AL - Iterations')
+plt.title(acq_func)

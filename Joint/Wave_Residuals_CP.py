@@ -208,7 +208,7 @@ u = u.unsqueeze(1) #Adding the variable channel
 norms = np.load(model_loc + '/FNO_Wave_cyclic-muntin_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
-cal_in, cal_out = data_loader(u[:100], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+cal_in, cal_out = data_loader(u[:500], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step'], configuration['T_out'])
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
@@ -239,7 +239,7 @@ ncf_scores = ncf_metric_joint(cal_out_residual.numpy(), cal_pred_residual.numpy(
 
 # %% 
 #Checking for coverage from a portion of the available data
-pred_in, pred_out = data_loader(u[-100:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+pred_in, pred_out = data_loader(u[-500:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 pred_pred, mse, mae = validation_AR(model, pred_in, pred_out, configuration['Step'], configuration['T_out'])
 pred_out = out_normalizer.decode(pred_out)
 pred_pred = out_normalizer.decode(pred_pred)
@@ -311,6 +311,24 @@ filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
 print(filtered_sims)
 print(f'{sum(filtered_sims)} simulations rejected')
 
+# %% 
+
+# %%
+#Plotting the error bars. 
+idx = 5
+t_idx = 10
+values = [
+          prediction_sets[0][t_idx],
+          prediction_sets[1][t_idx]
+          ]
+
+titles = [
+          r'$- \hat q \times mod$',
+          r'$+ \hat q \times mod$'
+          ]
+
+subplots_2d(values, titles)
+# %%
 
 # %% 
 

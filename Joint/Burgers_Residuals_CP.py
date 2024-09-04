@@ -303,3 +303,21 @@ prediction_sets =  [- qhat*modulation, + qhat*modulation]
 filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
 print(filtered_sims)
 print(f'{sum(filtered_sims)} simulations rejected')
+
+# %% 
+#Plotting Coverage
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets =  [- qhat*modulation, + qhat*modulation]
+
+from Utils.plot_tools import subplots_1d
+x_values = x[1:-1]
+idx = 5
+values = {"Residual": pred_residual[idx],
+          "Lower": prediction_sets[0],
+          "Upper": prediction_sets[1]
+          }
+
+indices = [2, 3, 6, 7]
+subplots_1d(x_values, values, indices, "CP within the residual space.")
+# %%
