@@ -1,36 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Uncertainty quantification of a Neural PDE Surrogate solving the Advection Equation using Physics Residuals and guaranteed using Conformal Prediction
-Prediction Selection/Rejection based on CP bounds. 
+Uncertainty quantification of a Neural PDE Surrogate solving the Wave Equation using Physics Residuals and guaranteed using Conformal Prediction
+Prediction Selection/Rejection based on CP bounds / PRE / Random Sampling 
+Utilised for Active Learning
 
 Equation :  U_t + v U_x = 0
+Eqn:  u_t + u*u_x =  nu*u_xx on [0,2]
 Surrogate Model : FNO
-Numerical Solver : https://github.com/gitvicky/Neural_PDE/blob/main/Numerical_Solvers/Advection/Advection_1D.py
+Numerical Solver: https://github.com/gitvicky/Neural_PDE/tree/main/Numerical_Solvers/Burgers
 """
 
 # %% Training Configuration - used as the config file for simvue.
-configuration = {"Case": 'Advection',
+configuration = {"Case": 'Burgers',
                  "Field": 'u',
                  "Model": 'FNO',
                  "Epochs": 100,
-                 "Batch Size": 100,
+                 "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.001,
                  "Scheduler Step": 100,
                  "Scheduler Gamma": 0.5,
                  "Activation": 'Tanh',
-                 "Normalisation Strategy": 'Identity',
+                 "Normalisation Strategy": 'Min-Max',
                  "T_in": 1,    
-                 "T_out": 10,
+                 "T_out": 20,
                  "Step": 1,
-                 "Width": 8, 
-                 "Modes": 4,
+                 "Width": 16, 
+                 "Modes": 8,
                  "Variables":1, 
                  "Noise":0.0, 
                  "Loss Function": 'MSE',
-                 "n_train": 100,
-                 "n_test": 1000,
+                 "n_train": 10,
+                 "n_test": 10,
                  "n_cal": 1000,
                  "n_pred": 100
                  }
@@ -78,71 +80,103 @@ batch_size = configuration['Batch Size']
 
 # %% 
 #Simulation Setup
-from Neural_PDE.Numerical_Solvers.Advection.Advection_1D import *
+from Neural_PDE.Numerical_Solvers.Burgers.Burgers_1D import * 
 from pyDOE import lhs
 
-#Obtaining the exact and FD solution of the 1D Advection Equation. 
-Nx = 200 #Number of x-points
-Nt = 50 #Number of time instances 
-x_min, x_max = 0.0, 2.0 #X min and max
-t_end = 0.5 #time length
-v = 1.0
-sim = Advection_1d(Nx, Nt, x_min, x_max, t_end) 
+Nx = 1000 #Number of x-points
+Nt = 500 #Number of time instances 
+x_min = 0.0 #Min of X-range 
+x_max = 2.0 #Max of X-range 
+t_end = 1.25 #Time Maximum
+nu = 0.002
+x_slice = 5
+t_slice = 10
+# x_slice, t_slice = 1, 1
+# alpha, beta, gamma = 1.0, 1.0, 1.0
+sim = Burgers_1D(Nx, Nt, x_min, x_max, t_end, nu) 
 dt, dx = sim.dt, sim.dx
+dx, dt = dx*x_slice, dt*t_slice
 # %% 
 #Utility Functions
 
 def gen_data(params):
-    #Generating Data 
+    print("Generating Data via Numerical Sims.")
     u_sol = []
     for ii in tqdm(range(len(params))):
-        xc = params[ii, 0]
-        amp = params[ii, 1]
-        x, t, u_soln, u_exact = sim.solve(xc, amp, v)
+        sim.InitializeU(params[ii,0], params[ii,1], params[ii,2])
+        u_soln, x, dt = sim.solve()
         u_sol.append(u_soln)
 
     #Extraction
-    u_sol = np.asarray(u_sol)
-    u_sol = u_sol[:, :, 1:-2]
-    x = x[1:-2]
+    u_sol = np.asarray(u_sol)[:, ::t_slice, ::x_slice]
+    x = x[::x_slice]
+    dt = dt*t_slice
 
     #Tensorize
     u = torch.tensor(u_sol, dtype=torch.float32)
-    u = u.permute(0, 2, 1) #only for FNO
-    u = u.unsqueeze(1)
+    u = u.permute(0, 2, 1) #Adding BS and Permuting for FNO
+    u = u.unsqueeze(1) #Adding the variable channel
 
-    return x, t, u
+    return x, dt, u
+
 
 #Generate Initial Conditions
 def gen_ic(params):
     u_ic = []
     for ii in tqdm(range(len(params))):
-        xc = params[ii, 0]
-        amp = params[ii, 1]
-        sim.initializeU(xc, amp)
-        u_ic.append(sim.u)
+        sim.InitializeU(params[ii,0], params[ii,1], params[ii,2])
+        u_ic.append(sim.u0)
 
-    u_ic = np.asarray(u_ic)[:, 1:-2]
-
+    u_ic = np.asarray(u_ic)[:, ::x_slice]
     u_ic = torch.tensor(u_ic, dtype=torch.float32).unsqueeze(1).unsqueeze(-1)
     return u_ic
 
-#Load Simulation data into Dataloader
-def data_loader(uu, dataloader=True, shuffle=True):
+def normalisation(norm_strategy, data=None, norms=None):
+    if norm_strategy == 'Min-Max':
+        normalizer = MinMax_Normalizer
+    elif norm_strategy == 'Range':
+        normalizer = RangeNormalizer
+    elif norm_strategy == 'Gaussian':
+        normalizer = GaussianNormalizer
+    elif norm_strategy == 'Identity':
+        normalizer = Identity
 
-    a = uu[:, :, :, :T_in]
-    u = uu[:, :, :, T_in:T_out+T_in]
+    inputs = data[..., :T_in]
+    outputs = data[..., T_in:T_out+T_in]
+    in_normalizer = normalizer(inputs)
+    out_normalizer = normalizer(outputs)
+
+    if data==None:
+        #Loading the Normaliation values
+        in_normalizer = normalizer(torch.tensor(0))
+        in_normalizer.a = torch.tensor(norms['in_a'])
+        in_normalizer.b = torch.tensor(norms['in_b'])
+        
+        out_normalizer = normalizer(torch.tensor(0))
+        out_normalizer.a = torch.tensor(norms['out_a'])
+        out_normalizer.b = torch.tensor(norms['out_b'])
+        
+    return in_normalizer, out_normalizer
+
+
+#Load Simulation data into Dataloader
+def data_loader(uu, in_normalizer, out_normalizer, dataloader=True, shuffle=True):
+
+    a = uu[..., :T_in]
+    u = uu[..., T_in:T_out+T_in]
 
     # print("Input: " + str(a.shape))
     # print("Output: " + str(u.shape))
 
-    #No Normalisation -- Normalisation = Identity 
+    #Performing the Normalisation and Setting up the DataLoaders
+    a = in_normalizer.encode(a)
+    u  = out_normalizer.encode(u)
 
     if dataloader:
-        loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(a, u), batch_size=batch_size, shuffle=shuffle)
+        loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(a, u), batch_size=configuration['Batch Size'], shuffle=shuffle)
+    #Performing the normalisation on the input alone. 
     else:
         loader = [a,u]
-
     return loader
 
 
@@ -166,28 +200,38 @@ def train(epochs, model, train_loader, test_loader, loss_func, optimizer, schedu
     return model 
 # %% 
 #Define Bounds
-lb = np.asarray([0.5, 50]) #pos, amplitude
-ub = np.asarray([1.0, 200])
+lb = np.asarray([-3, -3, -3]) # Lower Bound of the parameter domain
+ub = np.asarray([3, 3, 3]) # Upper bound of the parameter domain
 
 #Conv kernels --> Stencils 
 from Utils.ConvOps_1d import ConvOperator
 #Defining the required Convolutional Operations. 
 D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
 D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
+D_xx = ConvOperator(domain='x', order=2)#, scale=gamma)
 
-#Residual - Additive Kernels
-D = ConvOperator()
-D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
+dx = torch.tensor(dx, dtype=torch.float32)
+dt = torch.tensor(dt, dtype=torch.float32)
+nu = torch.tensor(nu, dtype=torch.float32)
+
+# Residual
+def residual(uu, boundary=False):
+    res = dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1]
 
 ################################################################
 #Train Data
-params = lb + (ub - lb) * lhs(2, configuration['n_train'])
+params = lb + (ub - lb) * lhs(3, configuration['n_train'])
 x, t, u_sol_train = gen_data(params)
-train_loader = data_loader(u_sol_train)
-test_loader = data_loader(u_sol_train[-10:]) #Just kept to hefty evaluations each epoch. 
+in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], inputs= u_sol_train[..., :T_in],  outputs=u_sol_train[..., T_in:T_out+T_in])
+train_loader = data_loader(u_sol_train, in_normalizer, out_normalizer)
+test_loader = data_loader(u_sol_train[-10:], in_normalizer, out_normalizer) #Just kept to hefty evaluations each epoch. 
 
 #Test Data
-params = lb + (ub - lb) * lhs(2, configuration['n_test'])
+params = lb + (ub - lb) * lhs(3, configuration['n_test'])
 x, t, u_sol = gen_data(params)
 test_a, test_u = data_loader(u_sol, dataloader=False, shuffle=False)
 test_mse = []
@@ -208,7 +252,6 @@ start_time = default_timer()
 model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
 train_time = default_timer() - start_time
 
-
 #Evaluation
 pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
 test_mse.append(mse)
@@ -217,24 +260,23 @@ print('Testing Error (MAE) : %.3e' % (mae))
 print()
 
 # %% 
-
 ## Using Calibration Data from smaller sample of simulations
-params = lb + (ub - lb) * lhs(2, configuration['n_cal'])
+params = lb + (ub - lb) * lhs(3, configuration['n_cal'])
 x, t, u_sol = gen_data(params)
 u_in_cal, u_out_cal = data_loader(u_sol, dataloader=False, shuffle=False)
 u_pred_cal, mse, mae = validation_AR(model, u_in_cal, u_out_cal, step, T_out)
 
-residual_out_cal = D(u_out_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
-residual_pred_cal = D(u_pred_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
+residual_out_cal = residual(u_out_cal.permute(0,1,3,2)[:,0])
+residual_pred_cal = residual(u_pred_cal.permute(0,1,3,2)[:,0])
 
 # %%
 #Prediction Residuals 
-params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
+params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
 u_in_pred = gen_ic(params)
 pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
 pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 uu_pred = pred_pred
-pred_residual = D(uu_pred)[...,1:-1, 1:-1]
+pred_residual = residual(uu_pred)
 
 # res = residual_out_cal #Data-Driven
 res = residual_pred_cal #Physics-Driven
@@ -274,18 +316,18 @@ def filter_sims_joint(prediction_sets, y_response):
 
 n_iterations = 5
 epochs = 100
-acq_func = 'RAND' #CP, PRE, RAND
+acq_func = 'CP' #CP, PRE, RAND
 alpha = 0.5 #CP-alpha 
 
 for ii in range(n_iterations):
 
     #Prediction Residuals 
-    params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
+    params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
     u_in_pred = gen_ic(params)
     pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
     pred_pred = pred_pred.permute(0,1,3,2)[:,0]
     uu_pred = pred_pred
-    pred_residual = D(uu_pred)[...,1:-1, 1:-1]
+    pred_residual = residual(uu_pred)
 
     if acq_func == 'CP':
     #Selection/Rejection using Joint CP
@@ -334,8 +376,4 @@ plt.ylabel('MSE')
 plt.xlabel('AL - Iterations')
 plt.title(acq_func)
 # %%
-#mse includes the first evaluation as well. 
-mse_cp = [0.0318748 , 0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
-sims_sampled_cp = [50, 77, 42, 20, 20]
-mse_pre = [0.0318748 , 0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
-mse_rand = [0.0318748 , 0.00642819, 0.00465056, 0.00317558, 0.00264536,0.00237693]
+# mse_cp = []
