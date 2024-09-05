@@ -32,9 +32,9 @@ configuration = {"Case": 'Wave',
                  "Variables":1, 
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
-                 "n_train": 5,
-                 "n_test": 10,
-                 "n_cal": 100,
+                 "n_train": 500,
+                 "n_test": 1000,
+                 "n_cal": 1000,
                  "n_pred": 100
                  }
 
@@ -77,6 +77,7 @@ from Neural_PDE.UQ.inductive_cp import *
 file_loc = os.getcwd()
 model_loc = file_loc + '/Weights'
 plot_loc = file_loc + '/Plots'
+data_loc = file_loc + '/Data'
 
 #Setting up the seeds and devices
 torch.manual_seed(0)
@@ -239,6 +240,8 @@ def residual(uu, boundary=False):
 #Train Data
 params = lb + (ub - lb) * lhs(3, configuration['n_train'])
 x, t, u_sol_train = gen_data(params)
+np.savez(data_loc + '/wave_data_train.npz', x=x, t=t, u_sol_train=u_sol_train)
+
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], data=u_sol_train)
 
 saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
@@ -256,8 +259,10 @@ test_loader = data_loader(u_sol_train[-10:], in_normalizer, out_normalizer) #Jus
 
 #Test Data
 params = lb + (ub - lb) * lhs(3, configuration['n_test'])
-x, t, u_sol = gen_data(params)
-test_a, test_u = data_loader(u_sol, in_normalizer, out_normalizer, dataloader=False, shuffle=False)
+x, t, u_sol_test = gen_data(params)
+np.savez(data_loc + '/wave_data_test.npz', x=x, t=t, u_sol_test=u_sol_test)
+
+test_a, test_u = data_loader(u_sol_test, in_normalizer, out_normalizer, dataloader=False, shuffle=False)
 test_mse = []
 
 #Initialising the model
@@ -279,7 +284,7 @@ train_time = default_timer() - start_time
 
 #Saving the Model
 saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '_0' + '.pth'
-torch.save( model.state_dict(), saved_model)
+torch.save(model.state_dict(), saved_model)
 run.save_file(saved_model, 'output')
 
 #Evaluation
@@ -339,6 +344,10 @@ plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
 
+plot_name = plot_loc + '/coverage' + '_' + run.name + '.png'
+plt.savefig(plot_name)
+run.save_file(plot_name, 'output')
+
 # %% 
 ###################################################################
 #Filtering Sims using CP. 
@@ -354,7 +363,7 @@ def filter_sims_joint(prediction_sets, y_response):
 #PRE - Filtering using the predicitons with the largest residual errors. 
 #RAND - Randomly sampling from the parameter space. 
 
-funcs = ['CP, ''PRE', 'RAND']
+funcs = ['CP', 'PRE', 'RAND']
 n_iterations = 5
 epochs = 100
 acq_func = 'CP' #CP, PRE, RAND
@@ -365,7 +374,7 @@ for acq_func in funcs:
     model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
     model.load_state_dict(torch.load(saved_model, map_location=device))
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
     
     test_mse = []
@@ -393,7 +402,7 @@ for acq_func in funcs:
 
         if acq_func == 'PRE':
         #Selection/Rejection using Descending order of PRE
-            pred_residual_mean = torch.mean(pred_residual, axis=tuple(range(1, pred_residual.ndim)))
+            pred_residual_mean = torch.mean(torch.abs(pred_residual), axis=tuple(range(1, pred_residual.ndim)))
             pred_residual_mean_sorted, sort_index = torch.sort(pred_residual_mean)
             num_sims = int((1-alpha)*configuration['n_pred'])
             params_filtered = params[sort_index][:num_sims]
@@ -434,4 +443,5 @@ for acq_func in funcs:
     run.save_object(np.asarray(test_mse), 'output', name=acq_func + '_mse')
     run.save_object(np.asarray(sims_sampled), 'output', name=acq_func + '_sims_sampled')
 
+run.close()
 # %%

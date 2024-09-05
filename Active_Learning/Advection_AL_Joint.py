@@ -35,8 +35,22 @@ configuration = {"Case": 'Advection',
                  "n_pred": 100
                  }
 
-#Importing the necessary packages
+
 import os
+from simvue import Run
+run = Run(mode='online')
+run.init(folder="/Neural_PDE/Active_Learning", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave', 'AL'], metadata=configuration)
+
+#Saving the current run file and the git hash of the repo
+run.save_file(os.path.abspath(__file__), 'code')
+import git
+repo = git.Repo(search_parent_directories=True)
+sha = repo.head.object.hexsha
+run.update_metadata({'Git Hash': sha})
+
+# %% 
+#Importing the necessary packages
+import copy
 import sys
 import numpy as np
 from tqdm import tqdm 
@@ -58,6 +72,9 @@ from Neural_PDE.UQ.inductive_cp import *
 
 #Setting up locations. 
 file_loc = os.getcwd()
+model_loc = file_loc + '/Weights'
+plot_loc = file_loc + '/Plots'
+data_loc = file_loc + '/Data'
 
 #Setting up the seeds and devices
 torch.manual_seed(0)
@@ -161,7 +178,8 @@ def train(epochs, model, train_loader, test_loader, loss_func, optimizer, schedu
         # test_loss = test_loss / ntest / num_vars
 
         print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
-        
+        run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
+  
         scheduler.step()
     return model 
 # %% 
@@ -196,6 +214,7 @@ test_mse = []
 model = FNO_multi1d(T_in, step, modes, num_vars, width, width_vars=0)
 model.to(device)
 print("Number of model params : " + str(model.count_params()))
+run.update_metadata({'Number of Params': int(model.count_params())})
 
 #Setting up the optimizer and scheduler, loss and epochs 
 optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
@@ -207,6 +226,7 @@ epochs = configuration['Epochs']
 start_time = default_timer()
 model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
 train_time = default_timer() - start_time
+trained_model = copy.deepcopy(model)
 
 
 #Evaluation
@@ -215,6 +235,11 @@ test_mse.append(mse)
 print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
 print()
+
+run.update_metadata({'Initial Train Time': float(train_time),
+                     'MSE Test Error': float(mse),
+                     'MAE Test Error': float(mae)
+                    })
 
 # %% 
 
@@ -257,6 +282,9 @@ plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
 
+plot_name = plot_loc + '/coverage' + '_' + run.name + '.png'
+plt.savefig(plot_name)
+run.save_file(plot_name, 'output')
 # %% 
 ###################################################################
 #Filtering Sims using CP. 
@@ -272,156 +300,177 @@ def filter_sims_joint(prediction_sets, y_response):
 #PRE - Filtering using the predicitons with the largest residual errors. 
 #RAND - Randomly sampling from the parameter space. 
 
+funcs = ['CP', 'PRE', 'RAND']
 n_iterations = 5
 epochs = 100
 acq_func = 'RAND' #CP, PRE, RAND
 alpha = 0.5 #CP-alpha 
-
-for ii in range(n_iterations):
-
-    #Prediction Residuals 
-    params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
-    u_in_pred = gen_ic(params)
-    pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
-    pred_pred = pred_pred.permute(0,1,3,2)[:,0]
-    uu_pred = pred_pred
-    pred_residual = D(uu_pred)[...,1:-1, 1:-1]
-
-    if acq_func == 'CP':
-    #Selection/Rejection using Joint CP
-        qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-        prediction_sets =  [- qhat*modulation, + qhat*modulation]
-        filtered_sims = np.invert(filter_sims_joint(prediction_sets, pred_residual.numpy()))
-        params_filtered = params[filtered_sims]
-        print(f'{len(params_filtered)} predictions rejected')
-
-    if acq_func == 'PRE':
-    #Selection/Rejection using Descending order of PRE
-        pred_residual_mean = torch.mean(pred_residual, axis=tuple(range(1, pred_residual.ndim)))
-        pred_residual_mean_sorted, sort_index = torch.sort(pred_residual_mean)
-        num_sims = int((1-alpha)*configuration['n_pred'])
-        params_filtered = params[sort_index][:num_sims]
-        print(f'{len(params_filtered)} predictions rejected')
-
-    if acq_func == 'RAND':
-    #Random Selection
-        num_sims = int((1-alpha)*configuration['n_pred'])
-        random_index = np.random.randint(0, configuration['n_pred'], num_sims)
-        params_filtered = params[random_index]
-        print(f'{len(params_filtered)} predictions selected')
+run.update_metadata({'threshold_alpha': alpha})
 
 
-    #Numerical Sim over the Rejected Predictions and adding to training data.
-    x, t, u_sol = gen_data(params_filtered)
-    u_sol_train = torch.vstack((u_sol_train, u_sol))
-    train_loader = data_loader(u_sol_train)
+for acq_func in funcs:
+    model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
+    model.load_state_dict(torch.load(trained_model, map_location=device))
+    model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+    
+    test_mse = []
+    sims_sampled = []
 
-    #Fine-tuning with the Sampled Sims. 
-    start_time = default_timer()
-    model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
-    train_time = default_timer() - start_time
+        
+    for ii in range(n_iterations):
 
-    #Evaluation
-    pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
-    test_mse.append(mse)
-    print('Testing Error (MSE) : %.3e' % (mse))
-    print('Testing Error (MAE) : %.3e' % (mae))
-    print()
+        #Prediction Residuals 
+        params = lb + (ub - lb) * lhs(2, configuration['n_pred'])
+        u_in_pred = gen_ic(params)
+        pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
+        pred_pred = pred_pred.permute(0,1,3,2)[:,0]
+        uu_pred = pred_pred
+        pred_residual = D(uu_pred)[...,1:-1, 1:-1]
 
+        if acq_func == 'CP':
+        #Selection/Rejection using Joint CP
+            qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+            prediction_sets =  [- qhat*modulation, + qhat*modulation]
+            filtered_sims = np.invert(filter_sims_joint(prediction_sets, pred_residual.numpy()))
+            params_filtered = params[filtered_sims]
+            print(f'{len(params_filtered)} predictions rejected')
+
+        if acq_func == 'PRE':
+        #Selection/Rejection using Descending order of PRE
+            pred_residual_mean = torch.mean(torch.abs(pred_residual), axis=tuple(range(1, pred_residual.ndim)))
+            pred_residual_mean_sorted, sort_index = torch.sort(pred_residual_mean)
+            num_sims = int((1-alpha)*configuration['n_pred'])
+            params_filtered = params[sort_index][:num_sims]
+            print(f'{len(params_filtered)} predictions rejected')
+
+        if acq_func == 'RAND':
+        #Random Selection
+            num_sims = int((1-alpha)*configuration['n_pred'])
+            random_index = np.random.randint(0, configuration['n_pred'], num_sims)
+            params_filtered = params[random_index]
+            print(f'{len(params_filtered)} predictions selected')
+
+
+        #Numerical Sim over the Rejected Predictions and adding to training data.
+        x, t, u_sol = gen_data(params_filtered)
+        u_sol_train = torch.vstack((u_sol_train, u_sol))
+        train_loader = data_loader(u_sol_train)
+
+        #Fine-tuning with the Sampled Sims. 
+        start_time = default_timer()
+        model = train(epochs, model, train_loader, test_loader, loss_func, optimizer, scheduler)
+        train_time = default_timer() - start_time
+
+        #Evaluation
+        pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
+        test_mse.append(mse)
+        print('Testing Error (MSE) : %.3e' % (mse))
+        print('Testing Error (MAE) : %.3e' % (mae))
+        print()
+
+        test_mse.append(mse)
+        sims_sampled.append(len(params_filtered))
+
+    run.save_object(np.asarray(test_mse), 'output', name=acq_func + '_mse')
+    run.save_object(np.asarray(sims_sampled), 'output', name=acq_func + '_sims_sampled')
+
+run.close()
 # %% 
 plt.plot(test_mse)
 plt.ylabel('MSE')
 plt.xlabel('AL - Iterations')
 plt.title(acq_func)
 # %%
-#mse includes the first evaluation as well. 
-mse_cp = [0.0318748 , 0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
-sims_sampled_cp = [50, 77, 42, 20, 20]
-sims_sampled_pre = [50, 50, 50, 50, 50]
-mse_pre = [0.0318748 , 0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
-mse_rand = [0.0318748 , 0.00642819, 0.00465056, 0.00317558, 0.00264536,0.00237693]
+# #mse includes the first evaluation as well. 
+# mse_cp = [0.0318748 , 0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
+# sims_sampled_cp = [50, 77, 42, 20, 20]
+# sims_sampled_pre = [50, 50, 50, 50, 50]
+# mse_pre = [0.0318748 , 0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
+# mse_rand = [0.0318748 , 0.00642819, 0.00465056, 0.00317558, 0.00264536,0.00237693]
 
 
-import matplotlib.pyplot as plt
-import numpy as np
+# import matplotlib.pyplot as plt
+# import numpy as np
 
-# Generate some sample data
-x = np.arange(1, 6)
-y1 = np.random.randint(1, 10, 5)
-y2 = np.random.randint(1, 10, 5)
-y3 = np.random.randint(1, 10, 5)
+# # Generate some sample data
+# x = np.arange(1, 6)
+# y1 = np.random.randint(1, 10, 5)
+# y2 = np.random.randint(1, 10, 5)
+# y3 = np.random.randint(1, 10, 5)
 
-# Define a neutral color scheme
-colors = ['#C44E52', '#55A868', '#4C72B0', '#CCB974', '#8172B3']
+# # Define a neutral color scheme
+# colors = ['#C44E52', '#55A868', '#4C72B0', '#CCB974', '#8172B3']
 
-# Create the plot
-plt.figure(figsize=(12, 8))
+# # Create the plot
+# plt.figure(figsize=(12, 8))
 
-# Plot three lines
-plt.plot(x, mse_cp[1:], marker='o', color=colors[0], label='CP')
-plt.plot(x, mse_pre[1:], marker='s', color=colors[2], label='PRE')
-plt.plot(x, mse_rand[1:], marker='^', color=colors[1], label='RAND')
+# # Plot three lines
+# plt.plot(x, mse_cp[1:], marker='o', color=colors[0], label='CP')
+# plt.plot(x, mse_pre[1:], marker='s', color=colors[2], label='PRE')
+# plt.plot(x, mse_rand[1:], marker='^', color=colors[1], label='RAND')
 
-# Customize the plot
-plt.title('Active Learning Across 5 Training iterations.', fontsize=16)
-plt.xlabel('Iterations', fontsize=12)
-plt.xticks(x)
-plt.ylabel('MSE', fontsize=12)
-plt.legend()
-plt.grid(True, linestyle='--', alpha=0.7)
+# # Customize the plot
+# plt.title('Active Learning Across 5 Training iterations.', fontsize=16)
+# plt.xlabel('Iterations', fontsize=12)
+# plt.xticks(x)
+# plt.ylabel('MSE', fontsize=12)
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
 
-# Set the background color to a white
-plt.gca().set_facecolor('white')
+# # Set the background color to a white
+# plt.gca().set_facecolor('white')
 
-# Show the plot
-plt.tight_layout()
-plt.show()
-# %%
+# # Show the plot
+# plt.tight_layout()
+# plt.show()
+# # %%
 
-import matplotlib.pyplot as plt
-import numpy as np
+# import matplotlib.pyplot as plt
+# import numpy as np
 
-# Given data
-mse_cp = [0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
-sims_sampled_cp = [50, 77, 42, 20, 20]
-sims_sampled_pre = [50, 50, 50, 50, 50]
-mse_pre = [0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
-mse_rand = [0.00642819, 0.00465056, 0.00317558, 0.00264536, 0.00237693]
+# # Given data
+# mse_cp = [0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
+# sims_sampled_cp = [50, 77, 42, 20, 20]
+# sims_sampled_pre = [50, 50, 50, 50, 50]
+# mse_pre = [0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
+# mse_rand = [0.00642819, 0.00465056, 0.00317558, 0.00264536, 0.00237693]
 
-# Calculate cumulative sum for x-axis
-x_cp = np.cumsum(sims_sampled_cp)
-x_pre = np.cumsum(sims_sampled_pre)
+# # Calculate cumulative sum for x-axis
+# x_cp = np.cumsum(sims_sampled_cp)
+# x_pre = np.cumsum(sims_sampled_pre)
 
-# Create x-axis for RAND (assuming it's the same as PRE)
-x_rand = x_pre
+# # Create x-axis for RAND (assuming it's the same as PRE)
+# x_rand = x_pre
 
-# Define a neutral color scheme
-colors = ['#C44E52', '#55A868', '#4C72B0']
+# # Define a neutral color scheme
+# colors = ['#C44E52', '#55A868', '#4C72B0']
 
-# Create the plot
-plt.figure(figsize=(12, 8))
+# # Create the plot
+# plt.figure(figsize=(12, 8))
 
-# Plot three lines
-plt.plot(x_cp, mse_cp, marker='o', color=colors[0], label='CP')
-plt.plot(x_pre, mse_pre, marker='s', color=colors[1], label='PRE')
-plt.plot(x_rand, mse_rand, marker='^', color=colors[2], label='RAND')
+# # Plot three lines
+# plt.plot(x_cp, mse_cp, marker='o', color=colors[0], label='CP')
+# plt.plot(x_pre, mse_pre, marker='s', color=colors[1], label='PRE')
+# plt.plot(x_rand, mse_rand, marker='^', color=colors[2], label='RAND')
 
-# Customize the plot
-plt.title('Active Learning - Advection Equation', fontsize=16)
-plt.xlabel('Simulation Samples', fontsize=12)
-plt.ylabel('MSE', fontsize=12)
-plt.legend()
-plt.grid(True, linestyle='--', alpha=0.7)
+# # Customize the plot
+# plt.title('Active Learning - Advection Equation', fontsize=16)
+# plt.xlabel('Simulation Samples', fontsize=12)
+# plt.ylabel('MSE', fontsize=12)
+# plt.legend()
+# plt.grid(True, linestyle='--', alpha=0.7)
 
-# Set the background color to white
-plt.gca().set_facecolor('white')
+# # Set the background color to white
+# plt.gca().set_facecolor('white')
 
 
-combined_xticks = sorted(set(x_cp) | set(x_pre))
-# Set x-ticks to show the cumulative samples at each iteration
-plt.xticks(combined_xticks, [f'{x}' for x in combined_xticks])
+# combined_xticks = sorted(set(x_cp) | set(x_pre))
+# # Set x-ticks to show the cumulative samples at each iteration
+# plt.xticks(combined_xticks, [f'{x}' for x in combined_xticks])
 
-# Show the plot
-plt.tight_layout()
-plt.show()
-# %%
+# # Show the plot
+# plt.tight_layout()
+# plt.show()
+# # %%
