@@ -309,7 +309,7 @@ run.update_metadata({'threshold_alpha': alpha})
 
 
 for acq_func in funcs:
-    model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
+    model = FNO_multi1d(T_in, step, modes, num_vars, width, width_vars=0)
     model.load_state_dict(torch.load(trained_model, map_location=device))
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
