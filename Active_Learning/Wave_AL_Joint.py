@@ -32,9 +32,9 @@ configuration = {"Case": 'Wave',
                  "Variables":1, 
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
-                 "n_train": 500,
-                 "n_test": 1000,
-                 "n_cal": 1000,
+                 "n_train": 5,
+                 "n_test": 10,
+                 "n_cal": 100,
                  "n_pred": 100
                  }
 
@@ -354,20 +354,27 @@ def filter_sims_joint(prediction_sets, y_response):
 #PRE - Filtering using the predicitons with the largest residual errors. 
 #RAND - Randomly sampling from the parameter space. 
 
-funcs = ['CP', 'PRE', 'RAND']
-n_iterations = 1
-epochs = 10
+funcs = ['CP, ''PRE', 'RAND']
+n_iterations = 5
+epochs = 100
 acq_func = 'CP' #CP, PRE, RAND
 alpha = 0.5 #CP-alpha 
+run.update_metadata({'threshold_alpha': alpha})
 
 for acq_func in funcs:
     model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
     model.load_state_dict(torch.load(saved_model, map_location=device))
+    model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+    
     test_mse = []
+    sims_sampled = []
+    
     for ii in range(n_iterations):
 
         #Prediction Residuals 
-        params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
+        params = lb + (ub - lb) * lhs(3, 10)
         u_in_pred = gen_ic(params)
         u_in_pred = in_normalizer.encode(u_in_pred)
         pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], u_in_pred.shape[3], T_out)), configuration['Step'], configuration['T_out'])
@@ -412,15 +419,19 @@ for acq_func in funcs:
 
         #Evaluation
         pred_test, mse, mae = validation_AR(model, test_a, test_u, step, T_out)
-        test_mse.append(mse)
+
         print('Testing Error (MSE) : %.3e' % (mse))
         print('Testing Error (MAE) : %.3e' % (mae))
+
+        test_mse.append(mse)
+        sims_sampled.append(len(params_filtered))
 
         #Saving the Model
         saved_model_AL = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + acq_func + '_' + str(ii+1) + '.pth'
         torch.save( model.state_dict(), saved_model_AL)
         run.save_file(saved_model_AL, 'output')
 
-    print(acq_func)
-    print(np.asarray(test_mse))
-    run.save_object(np.asarray(test_mse), 'output', name=acq_func)
+    run.save_object(np.asarray(test_mse), 'output', name=acq_func + '_mse')
+    run.save_object(np.asarray(sims_sampled), 'output', name=acq_func + '_sims_sampled')
+
+# %%

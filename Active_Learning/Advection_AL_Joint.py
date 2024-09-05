@@ -337,5 +337,91 @@ plt.title(acq_func)
 #mse includes the first evaluation as well. 
 mse_cp = [0.0318748 , 0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
 sims_sampled_cp = [50, 77, 42, 20, 20]
+sims_sampled_pre = [50, 50, 50, 50, 50]
 mse_pre = [0.0318748 , 0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
 mse_rand = [0.0318748 , 0.00642819, 0.00465056, 0.00317558, 0.00264536,0.00237693]
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Generate some sample data
+x = np.arange(1, 6)
+y1 = np.random.randint(1, 10, 5)
+y2 = np.random.randint(1, 10, 5)
+y3 = np.random.randint(1, 10, 5)
+
+# Define a neutral color scheme
+colors = ['#C44E52', '#55A868', '#4C72B0', '#CCB974', '#8172B3']
+
+# Create the plot
+plt.figure(figsize=(12, 8))
+
+# Plot three lines
+plt.plot(x, mse_cp[1:], marker='o', color=colors[0], label='CP')
+plt.plot(x, mse_pre[1:], marker='s', color=colors[2], label='PRE')
+plt.plot(x, mse_rand[1:], marker='^', color=colors[1], label='RAND')
+
+# Customize the plot
+plt.title('Active Learning Across 5 Training iterations.', fontsize=16)
+plt.xlabel('Iterations', fontsize=12)
+plt.xticks(x)
+plt.ylabel('MSE', fontsize=12)
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Set the background color to a white
+plt.gca().set_facecolor('white')
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+# %%
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Given data
+mse_cp = [0.00642189, 0.00386953, 0.00276095, 0.00239962, 0.0022232]
+sims_sampled_cp = [50, 77, 42, 20, 20]
+sims_sampled_pre = [50, 50, 50, 50, 50]
+mse_pre = [0.00637728, 0.00460812, 0.00302673, 0.00250596, 0.0022536]
+mse_rand = [0.00642819, 0.00465056, 0.00317558, 0.00264536, 0.00237693]
+
+# Calculate cumulative sum for x-axis
+x_cp = np.cumsum(sims_sampled_cp)
+x_pre = np.cumsum(sims_sampled_pre)
+
+# Create x-axis for RAND (assuming it's the same as PRE)
+x_rand = x_pre
+
+# Define a neutral color scheme
+colors = ['#C44E52', '#55A868', '#4C72B0']
+
+# Create the plot
+plt.figure(figsize=(12, 8))
+
+# Plot three lines
+plt.plot(x_cp, mse_cp, marker='o', color=colors[0], label='CP')
+plt.plot(x_pre, mse_pre, marker='s', color=colors[1], label='PRE')
+plt.plot(x_rand, mse_rand, marker='^', color=colors[2], label='RAND')
+
+# Customize the plot
+plt.title('Active Learning - Advection Equation', fontsize=16)
+plt.xlabel('Simulation Samples', fontsize=12)
+plt.ylabel('MSE', fontsize=12)
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Set the background color to white
+plt.gca().set_facecolor('white')
+
+
+combined_xticks = sorted(set(x_cp) | set(x_pre))
+# Set x-ticks to show the cumulative samples at each iteration
+plt.xticks(combined_xticks, [f'{x}' for x in combined_xticks])
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+# %%
