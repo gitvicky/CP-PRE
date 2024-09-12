@@ -179,8 +179,12 @@ dt = torch.tensor(dt, dtype=torch.float32)
 nu = torch.tensor(nu, dtype=torch.float32)
 
 # Residual
-def residual(uu):
-    return dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
+def residual(uu, boundary=False):
+    res = dx*D_t(uu) + dt * uu * D_x(uu) - nu * D_xx(uu) * (2*dt/dx)
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1]
 
 #Loading the Model  
 model = FNO_multi1d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Variables'], configuration['Width'], width_vars=0)
@@ -210,30 +214,30 @@ cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step']
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
 
-# cal_residual = residual(cal_pred.permute(0,1,3,2)[:,0]) #Physics-Driven
-cal_residual = residual(cal_out.permute(0,1,3,2)[:,0]) #Data-Driven
-ncf_scores = np.abs(cal_residual.numpy())
+cal_pred_residual = residual(cal_pred.permute(0,1,3,2)[:,0]) #Physics-Driven
+cal_out_residual = residual(cal_out.permute(0,1,3,2)[:,0])#Data-Driven
+ncf_scores  = np.abs(cal_out_residual.numpy() -  cal_pred_residual.numpy())
 
 # %% 
-from Utils.plot_tools import subplots_1d
-x_values = x[1:-1]
-idx = 40
-values = {"Target": cal_out[idx][0][1:-1, 1:-1].T, 
-          "Pred.": cal_pred[idx][0][1:-1, 1:-1].T,
-          }
+# from Utils.plot_tools import subplots_1d
+# x_values = x[1:-1]
+# idx = 40
+# values = {"Target": cal_out[idx][0].T, 
+#           "Pred.": cal_pred[idx][0].T,
+#           }
 
-indices = [5, 10, 15, 20]
-subplots_1d(x_values, values, indices, "Plotting NN performance across calibration space.")
+# indices = [5, 10, 15, 20]
+# subplots_1d(x_values, values, indices, "Plotting NN performance across calibration space.")
 
-# %%
-x_values = x[1:-1]
-idx = 40
-values = {"Residual: Targ.": residual(cal_out.permute(0,1,3,2)[:,0])[idx][1:-1, 1:-1], 
-          "Residual: Pred.": residual(cal_pred.permute(0,1,3,2)[:,0])[idx][1:-1, 1:-1],
-          }
+# # %%
+# x_values = x[1:-1]
+# idx = 40
+# values = {"Residual: Targ.": residual(cal_out.permute(0,1,3,2)[:,0])[idx], 
+#           "Residual: Pred.": residual(cal_pred.permute(0,1,3,2)[:,0])[idx],
+#           }
 
-indices = [5, 10, 15, 20]
-subplots_1d(x_values, values, indices, "Residual Comparison")
+# indices = [5, 10, 15, 20]
+# subplots_1d(x_values, values, indices, "Residual Comparison")
 
 # %% 
 #Checking for coverage from a portion of the available data
@@ -250,7 +254,7 @@ alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [- qhat, + qhat]
+    prediction_sets = [pred_residual.numpy() - qhat,  pred_residual.numpy() +  qhat]
     emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
@@ -261,34 +265,44 @@ plt.ylabel('Empirical Coverage')
 plt.legend()
 
 # %% 
-#Prediction Residuals - further interpolating within the area using only ICs. 
-params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
-u_in_pred = gen_ic(params)
-pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], configuration['T_out'])), configuration['Step'], configuration['T_out'])
-pred_pred = out_normalizer.decode(pred_pred)
-pred_pred = pred_pred.permute(0,1,3,2)[:,0]
-pred_residual = residual(pred_pred)
+###################################################################
+#Filtering Sims -- using PRE only 
+# res = cal_out_residual #Data-Driven
+res = cal_pred_residual #Physics-Driven
 
-#Selection/Rejection
+ncf_scores = np.abs(res.numpy())
+
+#Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+# alpha_levels = np.arange(0.05, 0.95, 0.1)
+alpha_levels = np.arange(0.05, 0.95 + 0.1, 0.1)
+
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [- qhat, + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, pred_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+
+# %% 
+#Plotting Coverage
 alpha = 0.1
-threshold = 0.9
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [- qhat,  + qhat]
+prediction_sets =  [- qhat, + qhat]
 
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
-idx = 40
-values = {"Residual": pred_residual[idx][1:-1, 1:-1], 
-          "Lower": prediction_sets[0][1:-1, 1:-1],
-          "Upper": prediction_sets[1][1:-1, 1:-1]
+idx = 5
+values = {"Residual": pred_residual[idx],
+          "Lower": prediction_sets[0],
+          "Upper": prediction_sets[1]
           }
 
-indices = [5, 10, 15, 20]
+indices = [2, 3, 6, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
-
-filtered_sims = filter_sims_within_bounds(prediction_sets[0], prediction_sets[1], pred_residual.numpy(), threshold=threshold)
-params_filtered = params[filtered_sims]
-print(f'{len(params_filtered)} simulations rejected')
-
 # %%
-

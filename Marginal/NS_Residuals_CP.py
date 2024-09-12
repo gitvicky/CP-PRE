@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Desc. 
-Ideal MHD - Finite Volume Solver.
+Incompressible Navier-Stokes - Finite Volume Solver.
 
 Parameterisation of calibration and prediction data: 
         lb = np.asarray([0.1, 0.1]) #a, b
@@ -10,11 +10,11 @@ Parameterisation of calibration and prediction data:
 """
 
 # %%
-configuration = {"Case": 'MHD',
-                 "Field": 'rho, u, v, p, Bx, By',
+configuration = {"Case": 'Navier-Stokes',
+                 "Field": 'u, v, p, w',
                  "Model": 'FNO',
                  "Epochs": 500,
-                 "Batch Size": 50,
+                 "Batch Size": 5,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
                  "Scheduler Step": 100,
@@ -28,7 +28,7 @@ configuration = {"Case": 'MHD',
                  "Width_time": 16, 
                  "Width_vars": 0,  
                  "Modes": 8,
-                 "Variables":6, 
+                 "Variables":4, 
                  "Loss Function": 'LP',
                  "UQ": 'None', #None, Dropout
                  "n_cal": 100, 
@@ -71,16 +71,18 @@ torch.set_default_dtype(torch.float32)
 # %% 
 #Setting up the simulations 
 from pyDOE import lhs
-from Neural_PDE.Numerical_Solvers.MHD.ConstrainedMHD_2D import * 
+from Neural_PDE.Numerical_Solvers.Navier_Stokes.NS_2D_spectral import * 
 
-N = 128 #number of grid points
-boxsize = 1.0 #domain size
-tEnd = 0.5 #simulation timescale
-dx = boxsize/N
-dt = 1e-4
-
-# rho, u, v, p, bx, by, dt, x, err = solve(N, boxsize, dt, a, b, c)
-
+N = 400 #Number of grid points
+tStart = 0.0 #Starting time of the simulation
+tEnd = 0.5 #Simulation ending time
+dt = 0.001 #dt
+nu = 0.001#kinematic viscosity
+L = 1 #Domain Length
+aa = 1.0#parametrisation of initial Vx 
+bb = 1.0#parametrisation of initial Vx 
+solver= Navier_Stokes_2d(N, tStart, dt, dt, nu, L, aa, bb)
+u, v, p, w, x, t, err = solver.solve()
 
 # %% 
 # Utility Functions 
@@ -111,51 +113,43 @@ def unstack_fields(field, axis, variable_names):
 #Running the simulations. 
 def gen_data(params):
     #Generating Data 
-    Rho, uu, vv, pp, Bx, By = [], [], [], [], [], []
+    uu, vv, pp = [], [], []
 
     for ii in tqdm(range(len(params))):
-        rho, u, v, p, bx, by, dt, x, err = solve(N, boxsize, tEnd,  params[ii,0], params[ii,1], params[ii,2])
-        
-        Rho.append(rho)
+        sim = Navier_Stokes_2d(N, tStart, tEnd, dt, nu, L, params[ii,0], params[ii,1])
+        u, v, p, w, x, t, err = sim.solve()
         uu.append(u)
         vv.append(v)
         pp.append(p)
-        Bx.append(bx)
-        By.append(by)
 
     #Extraction
-    t_slice = 25
-    x_slice = 1
-
-    rho = np.asarray(Rho)[:, ::t_slice, ::x_slice, ::x_slice]
+    t_slice = 10 
+    x_slice = 4
     uu = np.asarray(uu)[:, ::t_slice, ::x_slice, ::x_slice]
     vv = np.asarray(vv)[:, ::t_slice, ::x_slice, ::x_slice]
     pp = np.asarray(pp)[:, ::t_slice, ::x_slice, ::x_slice]
-    Bx = np.asarray(Bx)[:, ::t_slice, ::x_slice, ::x_slice]
-    By = np.asarray(By)[:, ::t_slice, ::x_slice, ::x_slice]
 
-    variables = [rho, uu, vv, pp, Bx, By]
+    variables = [uu, vv, pp]
     variables = stacked_fields(variables)
 
-    return variables, x[::x_slice], dt*t_slice
+    return variables, x[::x_slice], t[::t_slice]
 
 #Generate Initial Conditions
 def gen_ic(params):
-    rho_ic, u_ic, v_ic, p_ic, bx_ic, by_ic = [], [], [], [], [], []
+    u_ic, v_ic, p_ic = [], [], []
 
     for ii in tqdm(range(len(params))):
-        rho, u, v, p, bx, by, dt, x, err = solve(N, boxsize, tEnd,  params[ii,0], params[ii,1], params[ii,2])
+        sim= Navier_Stokes_2d(N, tStart, tEnd, dt, nu, L, params[ii,0], params[ii,1])
+        solver= Navier_Stokes_2d(N, tStart, dt, dt, nu, L, aa, bb)
+        u, v, p, w, x, t, err = solver.solve()
 
-        rho_ic.append(rho[0])
         u_ic.append(u[0])
         v_ic.append(v[0])
         p_ic.append(p[0])
-        bx_ic.append(bx[0])
-        by_ic.append(by[0])
 
-    rho_ic, u_ic, v_ic, p_ic, bx_ic, by_ic = np.asarray(rho_ic), np.asarray(u_ic), np.asarray(v_ic), np.asarray(p_ic), np.asarray(bx_ic), np.asarray(by_ic)
+    u_ic, v_ic, p_ic = np.asarray(u_ic), np.asarray(v_ic), np.asarray(p_ic)
 
-    variables_ic = [rho_ic, u_ic, v_ic, p_ic, bx_ic, by_ic]
+    variables_ic = [u_ic, v_ic, p_ic]
     return stacked_fields(variables_ic)
 
 def normalisation(norm_strategy, norms):
@@ -203,10 +197,10 @@ def data_loader(uu, T_in, T_out, in_normalizer, out_normalizer, dataloader=True,
 
 # %%
 #Define Bounds
-lb = np.asarray([0.5, 0.5, 0.5]) #a, b, c
-ub = np.asarray([1.0, 1.0, 1.0])
+lb = np.asarray([0.5, 0.5]) #Vx - aa, Vy - bb
+ub = np.asarray([1.0, 1.0])
 
-dx = dx
+dx = np.asarray(x[-1] - x[-2])
 dy = dx
 dt = dt
 
@@ -226,8 +220,8 @@ D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
 
 #Continuity
 def residual_continuity(vars, boundary=False):
-    rho, u, v = vars[:,0], vars[:, 1], vars[:, 2]
-    res = D_t(rho) + u*D_x(rho) + rho*D_x(u) + v*D_y(rho) + rho*D_y(v) 
+    u, v = vars[:,0], vars[:, 1]
+    res = D_x(u) + (dx/dy) * D_y(v)
     if boundary:
         return res
     else: 
@@ -235,79 +229,46 @@ def residual_continuity(vars, boundary=False):
     
 #Momentum 
 def residual_momentum(vars, boundary=False):
-    rho, u, v, p, Bx, By = vars[:,0], vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
+    u, v, p = vars[:,0], vars[:, 1], vars[:, 2]
 
-    res_x = D_t(u) + u*D_x(u) + (1/rho)*D_x(p) - 2*(Bx/rho)*D_x(Bx) + v*D_y(u) - (By/rho)*D_y(Bx) - (Bx/rho)*D_y(By)
-    res_y = D_t(v) + u*D_x(v) + (1/rho)*D_y(p) - 2*(By/rho)*D_y(By) + v*D_y(v) - (By/rho)*D_x(Bx) - (Bx/rho)*D_x(By)
+    res_x = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy
+    res_y = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx
 
     if boundary:
         return res_x + res_y
     else: 
         return res_x[...,1:-1,1:-1,1:-1] + res_y[...,1:-1,1:-1,1:-1]
-
-#Gauss Law
-def residual_gauss(vars, boundary=False):
-    Bx, By = vars[:, 4], vars[:, 5]
-    res = D_x(Bx) + D_y(By)
     
-    if boundary:
-        return res
-    else: 
-        return res[...,1:-1,1:-1,1:-1]
-
-#Induction
-def residual_induction(vars, boundary=False):
-    u, v, p, Bx, By = vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
-    res_x = D_t(Bx) - By*D_y(u) + Bx*D_y(v) - v*D_y(Bx) + u*D_y(By) 
-    res_y = D_t(By) - By*D_x(u) - By*D_x(v) - v*D_x(Bx) + u*D_x(By)
-
-    if boundary:
-        return res_x + res_y
-    else: 
-        return res_x[...,1:-1,1:-1,1:-1] + res_y[...,1:-1,1:-1,1:-1]
-
-# #Euler
-# def residual_euler(vars, boundary=False):
-#     rho, u, v, p, Bx, By = vars[:, 0], vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
-#     res = 1/0
-       
-#     if boundary:
-#         return res
-#     else: 
-#         return res[...,1:-1,1:-1,1:-1]
 
 # %% 
 #Load the trained Model
 model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
-model.load_state_dict(torch.load(model_loc + '/FNO_MHD_swift-method.pth', map_location='cpu'))
+model.load_state_dict(torch.load(model_loc + '/FNO_Navier-Stokes_violent-remote.pth', map_location='cpu'))
 model.to(device)
 print("Number of model params : " + str(model.count_params()))
 
 #Loading normalisations 
-norms = np.load(model_loc + '/FNO_MHD_swift-method_norms.npz')
+norms = np.load(model_loc + '/FNO_Navier-Stokes_violent-remote_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
 # %% 
 # Loading the Calibration Data
 t1 = default_timer()
-data =  np.load(data_loc + '/Constrained_MHD_combined.npz')
+data =  np.load(data_loc + '/NS_Spectral_combined.npz')
 
-rho = data['rho'].astype(np.float32)
 u = data['u'].astype(np.float32)
 v = data['v'].astype(np.float32)
 p = data['p'].astype(np.float32)
-Bx = data['Bx'].astype(np.float32)
-By  = data['By'].astype(np.float32)
-
+w = data['w'].astype(np.float32)
 x = data['x'].astype(np.float32)
 y = data['x'].astype(np.float32)
-t = data['t'].astype(np.float32)
+dt = data['dt'].astype(np.float32)
+nu = 0.001#kinematic viscosity
 
-vars = stacked_fields([rho, u, v, p, Bx, By])
-field = ['rho', 'u', 'v', 'p', 'Bx', 'By']
+vars = stacked_fields([u,v,p,w])
 
-# %%
-#Calibration
+field = ['u', 'v', 'p', 'w']
+
 cal_in, cal_out = data_loader(vars[:configuration['n_cal']], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step'], configuration['T_out'])
 cal_out = out_normalizer.decode(cal_out)
@@ -317,25 +278,15 @@ print('Calibration Error (MSE) : %.3e' % (mse))
 print('Calibration Error (MAE) : %.3e' % (mae))
 
 # %% 
-# #Using the Continuity Equation. 
-# cal_pred_residual = residual_continuity(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_continuity(cal_out.permute(0,1,4,2,3)) #Data-Driven
+#Using the Continuity Equation. 
+cal_pred_residual = residual_continuity(cal_pred.permute(0,1,4,2,3)) 
+cal_out_residual = residual_continuity(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
-# #Using the Momentum Equation. 
-# cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
+#Using the Momentum Equation. 
+cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
+cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
-# #Using Gauss Law
-# cal_pred_residual = residual_gauss(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_gauss(cal_out.permute(0,1,4,2,3)) #Data-Driven
-
-# Using Induction
-cal_pred_residual = residual_induction(cal_pred.permute(0,1,4,2,3)) 
-cal_out_residual = residual_induction(cal_out.permute(0,1,4,2,3)) #Data-Driven
-
-
-modulation = modulation_func(cal_out_residual.numpy(), cal_pred_residual.numpy())
-ncf_scores = ncf_metric_joint(cal_out_residual.numpy(), cal_pred_residual.numpy(), modulation)
+ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 
 # %%
 #Checking for coverage from a portion of the available data
@@ -344,31 +295,21 @@ pred_pred, mse, mae = validation_AR(model, pred_in, pred_out, configuration['Ste
 pred_out = out_normalizer.decode(pred_out)
 pred_pred = out_normalizer.decode(pred_pred)
 
-# %%
 #Using the Continuity Equation. 
-# pred_residual = residual_continuity(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_continuity(pred_out.permute(0,1,4,2,3)) #Data
+pred_residual = residual_continuity(pred_pred.permute(0,1,4,2,3)) #Prediction
+val_residual = residual_continuity(pred_out.permute(0,1,4,2,3)) #Data
 
-# #Using the Momentum Equation. 
-# pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
-
-# # #Using Gauss Law
-# pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
-
-# #Using Gauss Law
-pred_residual = residual_induction(pred_pred.permute(0,1,4,2,3)) #Prediction
-val_residual = residual_induction(pred_out.permute(0,1,4,2,3)) #Data
-
+#Using the Momentum Equation. 
+pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
+val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
 
 #Emprical Coverage for all values of alpha 
 alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [pred_residual.numpy() - qhat*modulation, pred_residual.numpy() + qhat*modulation]
-    emp_cov_res.append(emp_cov_joint(prediction_sets, val_residual.numpy()))
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
 plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
@@ -379,20 +320,21 @@ plt.legend()
 
 # %% 
 ###################################################################
-#Filtering Sims -- using PRE only 
+#CP -- using PRE only 
 # res = cal_out_residual #Data-Driven
 res = cal_pred_residual #Physics-Driven
 
-modulation = modulation_func(res.numpy(), np.zeros(res.shape))
-ncf_scores = ncf_metric_joint(res.numpy(), np.zeros(res.shape), modulation)
+ncf_scores = np.abs(res.numpy())
 
 #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+# alpha_levels = np.arange(0.05, 0.95, 0.1)
 alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [- qhat*modulation, + qhat*modulation]
-    emp_cov_res.append(emp_cov_joint(prediction_sets, pred_residual.numpy()))
+    prediction_sets = [- qhat, + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, pred_residual.numpy()))
 
 plt.figure()
 plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
@@ -402,20 +344,8 @@ plt.ylabel('Empirical Coverage')
 plt.legend()
 
 # %% 
-###################################################################
-#Filtering Sims
-def filter_sims_joint(prediction_sets, y_response):
-    axes = tuple(np.arange(1,len(y_response.shape)))
-    return ((y_response >= prediction_sets[0]).all(axis = axes) & (y_response <= prediction_sets[1]).all(axis = axes))
 
-alpha = 0.5
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [- qhat*modulation, + qhat*modulation]
-filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
-print(filtered_sims)
-print(f'{sum(filtered_sims)} simulations rejected')
-
-# %%
+# %% 
 
 #Plotting the error bars. 
 idx = 5
@@ -426,8 +356,8 @@ values = [
           ]
 
 titles = [
-          r'$- \hat q \times mod$',
-          r'$+ \hat q \times mod$'
+          r'$- \hat q $',
+          r'$+ \hat q $'
           ]
 
 subplots_2d(values, titles)

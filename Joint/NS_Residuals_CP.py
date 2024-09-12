@@ -329,7 +329,7 @@ modulation = modulation_func(res.numpy(), np.zeros(res.shape))
 ncf_scores = ncf_metric_joint(res.numpy(), np.zeros(res.shape), modulation)
 
 #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
-alpha_levels = np.arange(0.05, 0.95, 0.1)
+alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)

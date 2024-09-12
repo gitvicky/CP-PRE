@@ -300,13 +300,13 @@ subplots_1d(x_values, values, indices, "CP within the residual space.")
 
 #%%
 ###################################################################
-#Filtering Sims -- using PRE only 
+# Data Free -- using PRE only 
 # ncf_scores = np.abs(residual_out_cal) #Data-Driven
 ncf_scores = np.abs(residual_pred_cal) #Physics-Driven
 ###################################################################
 
 #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
-alpha_levels = np.arange(0.05, 0.95, 0.1)
+alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)

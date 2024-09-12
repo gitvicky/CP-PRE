@@ -334,8 +334,7 @@ cal_pred_residual = residual_induction(cal_pred.permute(0,1,4,2,3))
 cal_out_residual = residual_induction(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
 
-modulation = modulation_func(cal_out_residual.numpy(), cal_pred_residual.numpy())
-ncf_scores = ncf_metric_joint(cal_out_residual.numpy(), cal_pred_residual.numpy(), modulation)
+ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 
 # %%
 #Checking for coverage from a portion of the available data
@@ -367,8 +366,8 @@ alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [pred_residual.numpy() - qhat*modulation, pred_residual.numpy() + qhat*modulation]
-    emp_cov_res.append(emp_cov_joint(prediction_sets, val_residual.numpy()))
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
 plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
@@ -383,16 +382,17 @@ plt.legend()
 # res = cal_out_residual #Data-Driven
 res = cal_pred_residual #Physics-Driven
 
-modulation = modulation_func(res.numpy(), np.zeros(res.shape))
-ncf_scores = ncf_metric_joint(res.numpy(), np.zeros(res.shape), modulation)
+ncf_scores = np.abs(res.numpy())
 
 #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+# alpha_levels = np.arange(0.05, 0.95, 0.1)
 alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [- qhat*modulation, + qhat*modulation]
-    emp_cov_res.append(emp_cov_joint(prediction_sets, pred_residual.numpy()))
+    prediction_sets = [- qhat, + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, pred_residual.numpy()))
 
 plt.figure()
 plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
@@ -400,20 +400,6 @@ plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', a
 plt.xlabel('1-alpha')
 plt.ylabel('Empirical Coverage')
 plt.legend()
-
-# %% 
-###################################################################
-#Filtering Sims
-def filter_sims_joint(prediction_sets, y_response):
-    axes = tuple(np.arange(1,len(y_response.shape)))
-    return ((y_response >= prediction_sets[0]).all(axis = axes) & (y_response <= prediction_sets[1]).all(axis = axes))
-
-alpha = 0.5
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets =  [- qhat*modulation, + qhat*modulation]
-filtered_sims = filter_sims_joint(prediction_sets, pred_residual.numpy())
-print(filtered_sims)
-print(f'{sum(filtered_sims)} simulations rejected')
 
 # %%
 
@@ -426,8 +412,8 @@ values = [
           ]
 
 titles = [
-          r'$- \hat q \times mod$',
-          r'$+ \hat q \times mod$'
+          r'$- \hat q $',
+          r'$+ \hat q $'
           ]
 
 subplots_2d(values, titles)

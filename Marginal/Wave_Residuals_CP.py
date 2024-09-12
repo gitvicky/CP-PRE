@@ -175,6 +175,14 @@ c = torch.tensor(c, dtype=torch.float32)
 D.kernel = D_tt.kernel - (c*dt/dx)**2 * D_xx_yy.kernel 
 residual = D
 
+# Residual
+def residual(uu, boundary=False):
+    res = D(uu)
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1,1:-1]
+
 #Loading the Model  
 model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration['Modes'], configuration['Modes'], configuration['Variables'], configuration['Width_time'])
 model.to(device)
@@ -200,37 +208,37 @@ u = u.unsqueeze(1) #Adding the variable channel
 norms = np.load(model_loc + '/FNO_Wave_cyclic-muntin_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
-cal_in, cal_out = data_loader(u[:100], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+cal_in, cal_out = data_loader(u[:500], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step'], configuration['T_out'])
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
 
-# cal_residual = residual(cal_pred.permute(0,1,4,2,3)[:,0]) #Physics-Driven
-cal_residual = residual(cal_out.permute(0,1,4,2,3)[:,0]) #Data-Driven
-ncf_scores = np.abs(cal_residual.numpy())
+cal_pred_residual = residual(cal_pred.permute(0,1,4,2,3)[:,0]) #Physics-Driven
+cal_out_residual = residual(cal_out.permute(0,1,4,2,3)[:,0]) #Data-Driven
+
+ncf_scores = np.abs(cal_out_residual.numpy() -  cal_pred_residual.numpy())
 
 # %% 
+# #Plotting the fields, prediction, abs error and the residual
+# idx = 5
+# t_idx = 10
+# values = [cal_out[0, 0,...,t_idx],
+#           cal_pred[0,0,...,t_idx],
+#           cal_pred[0,0,...,t_idx] - cal_out[0,0,...,t_idx],
+#           cal_pred_residual[idx, t_idx]
+#           ]
 
-#Plotting the fields, prediction, abs error and the residual
-idx = 5
-t_idx = 10
-values = [cal_out[0, 0,...,t_idx],
-          cal_pred[0,0,...,t_idx],
-          cal_pred[0,0,...,t_idx] - cal_out[0,0,...,t_idx],
-          cal_residual[idx, t_idx]
-          ]
+# titles = [r'$u$',
+#           r'$\tilde u$',
+#           r'$u - \tilde u$',
+#           r'$ \frac{\partial^2 \tilde u}{\partial t^2 } - c^2 (\frac{\partial^2 \tilde u}{\partial x^2} + \frac{\partial^2 \tilde u}{\partial y^2})$'
+#           ]
 
-titles = [r'$u$',
-          r'$\tilde u$',
-          r'$u - \tilde u$',
-          r'$ \frac{\partial^2 \tilde u}{\partial t^2 } - c^2 (\frac{\partial^2 \tilde u}{\partial x^2} + \frac{\partial^2 \tilde u}{\partial y^2})$'
-          ]
-
-subplots_2d(values, titles)
+# subplots_2d(values, titles)
 
 # %% 
 #Checking for coverage from a portion of the available data
-pred_in, pred_out = data_loader(u[-100:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+pred_in, pred_out = data_loader(u[-500:], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 pred_pred, mse, mae = validation_AR(model, pred_in, pred_out, configuration['Step'], configuration['T_out'])
 pred_out = out_normalizer.decode(pred_out)
 pred_pred = out_normalizer.decode(pred_pred)
@@ -243,7 +251,7 @@ alpha_levels = np.arange(0.05, 0.95, 0.1)
 emp_cov_res = []
 for alpha in tqdm(alpha_levels):
     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [- qhat, + qhat]
+    prediction_sets = [pred_residual.numpy() - qhat, pred_residual.numpy() + qhat]
     emp_cov_res.append(emp_cov(prediction_sets, val_residual.numpy()))
 
 plt.figure()
@@ -254,40 +262,54 @@ plt.ylabel('Empirical Coverage')
 plt.legend()
 
 # %% 
-#Prediction Residuals from IC sampling within the Bounds. 
-params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
-u_in_pred = gen_ic(params)
-pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], u_in_pred.shape[3], configuration['T_out'])), configuration['Step'], configuration['T_out'])
-pred_pred = out_normalizer.decode(pred_pred)
-pred_pred = pred_pred.permute(0,1,4,2,3)[:,0]
-pred_residual = residual(pred_pred)
-
-# %% 
-#Selection/Rejection
-alpha = 0.5
-threshold = 0.9
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [- qhat, + qhat]
-
-filtered_sims = filter_sims_within_bounds(prediction_sets[0], prediction_sets[1], pred_residual.numpy(), threshold=threshold)
-params_filtered = params[filtered_sims]
-print(f'{len(params_filtered)} simulations rejected')
+# #Prediction Residuals from IC sampling within the Bounds. 
+# params = lb + (ub - lb) * lhs(3, configuration['n_pred'])
+# u_in_pred = gen_ic(params)
+# u_in_pred = in_normalizer.encode(u_in_pred)
+# pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], u_in_pred.shape[3], configuration['T_out'])), configuration['Step'], configuration['T_out'])
+# pred_pred = out_normalizer.decode(pred_pred)
+# pred_pred = pred_pred.permute(0,1,4,2,3)[:,0]
+# pred_residual = residual(pred_pred)
 
 # %%
-#Plotting the fields, prediction, abs error and the residual
+###################################################################
+#Filtering Sims -- using PRE only 
+# res = cal_out_residual #Data-Driven
+res = cal_pred_residual #Physics-Driven
+
+ncf_scores = np.abs(res.numpy())
+
+#Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+alpha_levels = np.arange(0.05, 0.95, 0.1)
+alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [- qhat, + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, pred_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+
+
+
+# %%
+#Plotting the error bars. 
 idx = 5
 t_idx = 10
-values = [pred_pred[idx,t_idx],
-          pred_residual[idx,t_idx],
+values = [
           prediction_sets[0][t_idx],
           prediction_sets[1][t_idx]
           ]
 
-titles = [r'$\tilde u$',
-          r'$D(\tilde u)$',
-          r'$- \hat q$',
-          r'$+ \hat q$'
+titles = [
+          r'$- \hat q \times mod$',
+          r'$+ \hat q \times mod$'
           ]
 
 subplots_2d(values, titles)
-# %%
