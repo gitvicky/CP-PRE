@@ -354,3 +354,49 @@ indices = [2, 3, 6, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
 
 # %%
+
+#Paper Plots 
+import matplotlib as mpl 
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 5
+t_idx = -1
+
+plt.plot(x_values, pred_residual[idx, t_idx], label='PRE', color='black',lw=4, ls='--', alpha=0.75)
+plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Joint', color='blue',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Joint', color='navy',lw=4, ls='--',  alpha=0.75)
+
+plt.xlabel(r'$x$')
+plt.ylabel(r'$D(u)$')
+plt.title("Joint CP", fontsize=36)
+plt.legend(fontsize=36)
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_advection.svg", format="svg", bbox_inches='tight')
+plt.show()
+# %%
+
+plt.figure()
+plt.plot(x_values, pred_test[idx, 0, 1:-1, t_idx], label='Prediction', color='black',lw=4, ls='-',  alpha=0.75)
+
+plt.xlabel(r'$x$')
+plt.ylabel(r'$u$')
+plt.title("Prediction", fontsize=36)
+plt.legend(fontsize=36)
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/pred_advection.svg", format="svg", bbox_inches='tight')
+plt.show()
+# %%

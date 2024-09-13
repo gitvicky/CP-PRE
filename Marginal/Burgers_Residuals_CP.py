@@ -306,3 +306,4 @@ values = {"Residual": pred_residual[idx],
 indices = [2, 3, 6, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
 # %%
+#Plots for the paper
