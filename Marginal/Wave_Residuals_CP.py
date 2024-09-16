@@ -308,8 +308,144 @@ values = [
           ]
 
 titles = [
-          r'$- \hat q \times mod$',
-          r'$+ \hat q \times mod$'
+          r'$- \hat q$',
+          r'$+ \hat q$'
           ]
 
 subplots_2d(values, titles)
+
+# %%
+#Plots for the paper
+
+import matplotlib as mpl 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+import matplotlib.ticker as ticker
+
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [- qhat, + qhat]
+
+
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 26
+t_idx= 15
+
+
+
+preds = pred_pred.permute(0,1,4,2,3)[:,0]
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(preds[idx, t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$')
+ax.set_ylabel(r'$y$')
+ax.set_title(r'Prediction $(u)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.show()
+
+
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(pred_residual[idx, t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$')
+ax.set_ylabel(r'$y$')
+ax.set_title(r'PRE $\left(D(u)\right)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.svg", format="svg",transparent=True, bbox_inches='tight')
+plt.show()
+
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(prediction_sets[1][t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$')
+ax.set_ylabel(r'$y$')
+ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.show()
+
+# %%
