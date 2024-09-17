@@ -356,7 +356,7 @@ pred_pred = out_normalizer.decode(pred_pred)
 # pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
 # val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
 
-# #Using Gauss Law
+# #Using Induction Law
 pred_residual = residual_induction(pred_pred.permute(0,1,4,2,3)) #Prediction
 val_residual = residual_induction(pred_out.permute(0,1,4,2,3)) #Data
 

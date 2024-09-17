@@ -376,8 +376,8 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 # Set labels and title
-ax.set_xlabel(r'$x$')
-ax.set_ylabel(r'$y$')
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Prediction $(u)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.svg", format="svg", transparent=True, bbox_inches='tight')
@@ -409,8 +409,8 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 # Set labels and title
-ax.set_xlabel(r'$x$')
-ax.set_ylabel(r'$y$')
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'PRE $\left(D(u)\right)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.svg", format="svg",transparent=True, bbox_inches='tight')
@@ -441,8 +441,8 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 # Set labels and title
-ax.set_xlabel(r'$x$')
-ax.set_ylabel(r'$y$')
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')

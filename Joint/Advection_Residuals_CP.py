@@ -238,7 +238,6 @@ pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.sha
 pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 uu_pred = pred_pred
 pred_residual = D(uu_pred)[...,1:-1, 1:-1]
-
 # %% 
 #Plotting Coverage
 alpha = 0.1
@@ -354,8 +353,11 @@ indices = [2, 3, 6, 7]
 subplots_1d(x_values, values, indices, "CP within the residual space.")
 
 # %%
-
 #Paper Plots 
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [- qhat*modulation,  + qhat*modulation]
+
 import matplotlib as mpl 
 # Set matplotlib parameters
 mpl.rcParams['xtick.minor.visible'] = True
@@ -375,28 +377,54 @@ plt.rcParams['grid.linewidth'] = 0.5
 plt.rcParams['grid.alpha'] = 0.5
 plt.rcParams['grid.linestyle'] = '-'
 
-idx = 5
+idx = 20
 t_idx = -1
 
 plt.plot(x_values, pred_residual[idx, t_idx], label='PRE', color='black',lw=4, ls='--', alpha=0.75)
-plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Joint', color='blue',lw=4, ls='--',  alpha=0.75)
-plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Joint', color='navy',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Joint', color='navy',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Joint', color='blue',lw=4, ls='--',  alpha=0.75)
 
-plt.xlabel(r'$x$')
-plt.ylabel(r'$D(u)$')
+plt.xlabel(r'$x$', fontsize=36)
+plt.ylabel(r'$D(u)$', fontsize=36)
+
+# Customize x-axis ticks
+plt.xticks( # 5 ticks from min to max
+    fontsize=36  # Increase font size
+)
+plt.yticks( # 5 ticks from min to max
+        np.linspace(-0.1, 0.1, 5),
+    fontsize=36  # Increase font size
+)
+
 plt.title("Joint CP", fontsize=36)
 plt.legend(fontsize=36)
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_advection.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_advection.pdf", format="pdf", bbox_inches='tight')
 plt.show()
 # %%
-
 plt.figure()
-plt.plot(x_values, pred_test[idx, 0, 1:-1, t_idx], label='Prediction', color='black',lw=4, ls='-',  alpha=0.75)
 
-plt.xlabel(r'$x$')
-plt.ylabel(r'$u$')
+x, t, u_sol = gen_data(params)
+u_in_pred, u_out_pred = data_loader(u_sol, dataloader=False, shuffle=False)
+
+plt.plot(x, pred_pred[idx, t_idx], label='Prediction', color='black',lw=4, ls='-', alpha=0.75)
+plt.plot(x, u_out_pred[idx, 0, :, t_idx], label='Ground Truth', color='forestgreen',lw=4, ls='-',  alpha=0.75)
+
+plt.xlabel(r'$x$', fontsize=36)
+plt.ylabel(r'$u$', fontsize=36)
+
+# Customize x-axis ticks
+plt.xticks( # 5 ticks from min to max
+    fontsize=36  # Increase font size
+)
+plt.yticks( # 5 ticks from min to max
+        # np.linspace(-0.1, 0.1, 5),
+    fontsize=36  # Increase font size
+)
+
 plt.title("Prediction", fontsize=36)
 plt.legend(fontsize=36)
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/pred_advection.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/pred_advection.pdf", format="pdf", bbox_inches='tight')
 plt.show()
 # %%

@@ -344,6 +344,10 @@ print(f'{len(params_filtered)} simulations rejected')
 
 # %%
 #Paper Plots 
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [- qhat,  + qhat]
+
 import matplotlib as mpl 
 # Set matplotlib parameters
 mpl.rcParams['xtick.minor.visible'] = True
@@ -370,10 +374,21 @@ plt.plot(x_values, pred_residual[idx, t_idx], label='PRE', color='black',lw=4, l
 plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Marginal', color='maroon',lw=4, ls='--',  alpha=0.75)
 plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Marginal', color='red',lw=4, ls='--',  alpha=0.75)
 
-plt.xlabel(r'$x$')
-plt.ylabel(r'$D(u)$')
+plt.xlabel(r'$x$', fontsize=36)
+plt.ylabel(r'$D(u)$', fontsize=36)
+
+# Customize x-axis ticks
+plt.xticks( # 5 ticks from min to max
+    fontsize=36  # Increase font size
+)
+plt.yticks( # 5 ticks from min to max
+        # np.linspace(-0.002, 0.002, 5),
+    fontsize=36  # Increase font size
+)
+
 plt.title("Marginal CP", fontsize=36)
 plt.legend(fontsize=36)
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection.pdf", format="pdf", bbox_inches='tight')
 plt.show()
 # %%
