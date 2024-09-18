@@ -244,11 +244,11 @@ def residual_momentum(vars, boundary=False):
 
 
 #Energy
-def residual_euler(vars, boundary=False):
+def residual_energy(vars, boundary=False):
     rho, u, v, p, Bx, By = vars[:, 0], vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
     p_gas = p - 0.5*(Bx**2 + By**2)
 
-    res = D_t(rho) + u*D_x(p) + v*D_y(p) + (gamma-2)*(u*Bx+v*By)*(D_x(B_x) + D_y(B_y)) + (gamma*p_gas+By**2)*D_x(u) + (gamma*p_gas+Bx**2)*D_y(v)- Bx*By*(D_y(u) + D_x(v))
+    res = D_t(rho) + u*D_x(p) + v*D_y(p) + (gamma-2)*(u*Bx+v*By)*(D_x(Bx) + D_y(By)) + (gamma*p_gas+By**2)*D_x(u) + (gamma*p_gas+Bx**2)*D_y(v)- Bx*By*(D_y(u) + D_x(v))
        
     if boundary:
         return res
@@ -318,26 +318,34 @@ print('Calibration Error (MSE) : %.3e' % (mse))
 print('Calibration Error (MAE) : %.3e' % (mae))
 
 # %% 
+#Calibration based on PRE: 
+
+equation = 'momentum' #continuity, momentum, energy, induction, divergence
+
+if equation == 'continuity':
 # #Using the Continuity Equation. 
-# cal_pred_residual = residual_continuity(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_continuity(cal_out.permute(0,1,4,2,3)) #Data-Driven
+    cal_pred_residual = residual_continuity(cal_pred.permute(0,1,4,2,3)) 
+    cal_out_residual = residual_continuity(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
+if equation == 'momentum':
 # #Using the Momentum Equation. 
-# cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
+    cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
+    cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
+if equation == 'energy':
 #Using Energy Equation
-# cal_pred_residual = residual_energy(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_energy(cal_out.permute(0,1,4,2,3)) #Data-Driven
+    cal_pred_residual = residual_energy(cal_pred.permute(0,1,4,2,3)) 
+    cal_out_residual = residual_energy(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
-
+if equation == 'induction':
 # Using Induction
-cal_pred_residual = residual_induction(cal_pred.permute(0,1,4,2,3)) 
-cal_out_residual = residual_induction(cal_out.permute(0,1,4,2,3)) #Data-Driven
+    cal_pred_residual = residual_induction(cal_pred.permute(0,1,4,2,3)) 
+    cal_out_residual = residual_induction(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
+if equation == 'divergence':
 # #Using Gauss Law
-# cal_pred_residual = residual_gauss(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_gauss(cal_out.permute(0,1,4,2,3)) #Data-Driven
+    cal_pred_residual = residual_gauss(cal_pred.permute(0,1,4,2,3)) 
+    cal_out_residual = residual_gauss(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
 ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 
@@ -349,25 +357,31 @@ pred_out = out_normalizer.decode(pred_out)
 pred_pred = out_normalizer.decode(pred_pred)
 
 # %%
-#Using the Continuity Equation. 
-# pred_residual = residual_continuity(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_continuity(pred_out.permute(0,1,4,2,3)) #Data
 
+if equation == 'continuity':
+# #Using the Continuity Equation. 
+    pred_residual = residual_continuity(pred_pred.permute(0,1,4,2,3)) #Prediction
+    val_residual = residual_continuity(pred_out.permute(0,1,4,2,3)) #Data
+
+if equation == 'momentum':
 # #Using the Momentum Equation. 
-# pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
+    pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
+    val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
 
-# # Using Energy equation
-# pred_residual = residual_energy(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_energy(pred_out.permute(0,1,4,2,3)) #Data
+if equation == 'energy':
+#Using Energy Equation
+    pred_residual = residual_energy(pred_pred.permute(0,1,4,2,3)) #Prediction
+    val_residual = residual_energy(pred_out.permute(0,1,4,2,3)) #Data
 
-# #Using Induction Law
-pred_residual = residual_induction(pred_pred.permute(0,1,4,2,3)) #Prediction
-val_residual = residual_induction(pred_out.permute(0,1,4,2,3)) #Data
+if equation == 'induction':
+# Using Induction
+    pred_residual = residual_induction(pred_pred.permute(0,1,4,2,3)) #Prediction
+    val_residual = residual_induction(pred_out.permute(0,1,4,2,3)) #Data
 
-# # #Using Gauss Law
-# pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
+if equation == 'divergence':
+# #Using Gauss Law
+    pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
+    val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
 
 
 #Emprical Coverage for all values of alpha 
@@ -426,4 +440,107 @@ titles = [
           ]
 
 subplots_2d(values, titles)
+# %%
+#Paper Plots 
+
+import matplotlib as mpl 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+import matplotlib.ticker as ticker
+
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [-qhat, + qhat]
+
+
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 20
+t_idx= 15
+
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(pred_residual[idx, t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'PRE: $D_{cont.}(\rho, \vec{v})$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/mhd_residual_" + equation + "_.svg", format="svg",transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/mhd_residual_" + equation + "_.pdf", format="pdf",transparent=True, bbox_inches='tight')
+plt.show()
+
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(prediction_sets[1][t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_mhd_" + equation + "_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_mhd_" + equation + "_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
+
+plt.show()
+
 # %%

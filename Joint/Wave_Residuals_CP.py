@@ -460,6 +460,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -492,6 +493,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -503,6 +505,7 @@ ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Joint CP ($+\hat q \times mod)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_wave_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
 plt.show()
 
 # %%

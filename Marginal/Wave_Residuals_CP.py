@@ -370,6 +370,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -381,6 +382,7 @@ ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Prediction $(u)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.pdf", format="pdf", transparent=True, bbox_inches='tight')
 plt.show()
 
 
@@ -403,6 +405,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -414,6 +417,7 @@ ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'PRE $\left(D(u)\right)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.svg", format="svg",transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.pdf", format="pdf",transparent=True, bbox_inches='tight')
 plt.show()
 
 
@@ -435,6 +439,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -446,6 +451,7 @@ ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
 plt.show()
 
 # %%
