@@ -210,11 +210,8 @@ dx = dx
 dy = dx
 dt = dt
 
-alpha = 1/dt*2
-beta = 1/dx*2
-gamma = 1/dx**2                 
+gamma = 5/3 #Ideal Gas
 
-alpha, beta, gamma = 1,1,1
 
 from Utils.ConvOps_2d import ConvOperator
 #Defining the required Convolutional Operations. 
@@ -245,11 +242,14 @@ def residual_momentum(vars, boundary=False):
     else: 
         return res_x[...,1:-1,1:-1,1:-1] + res_y[...,1:-1,1:-1,1:-1]
 
-#Gauss Law
-def residual_gauss(vars, boundary=False):
-    Bx, By = vars[:, 4], vars[:, 5]
-    res = D_x(Bx) + D_y(By)
-    
+
+#Energy
+def residual_euler(vars, boundary=False):
+    rho, u, v, p, Bx, By = vars[:, 0], vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
+    p_gas = p - 0.5*(Bx**2 + By**2)
+
+    res = D_t(rho) + u*D_x(p) + v*D_y(p) + (gamma-2)*(u*Bx+v*By)*(D_x(B_x) + D_y(B_y)) + (gamma*p_gas+By**2)*D_x(u) + (gamma*p_gas+Bx**2)*D_y(v)- Bx*By*(D_y(u) + D_x(v))
+       
     if boundary:
         return res
     else: 
@@ -259,22 +259,23 @@ def residual_gauss(vars, boundary=False):
 def residual_induction(vars, boundary=False):
     u, v, p, Bx, By = vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
     res_x = D_t(Bx) - By*D_y(u) + Bx*D_y(v) - v*D_y(Bx) + u*D_y(By) 
-    res_y = D_t(By) - By*D_x(u) - By*D_x(v) - v*D_x(Bx) + u*D_x(By)
+    res_y = D_t(By) + By*D_x(u) - Bx*D_x(v) - v*D_x(Bx) + u*D_x(By)
 
     if boundary:
         return res_x + res_y
     else: 
         return res_x[...,1:-1,1:-1,1:-1] + res_y[...,1:-1,1:-1,1:-1]
 
-# #Euler
-# def residual_euler(vars, boundary=False):
-#     rho, u, v, p, Bx, By = vars[:, 0], vars[:, 1], vars[:, 2], vars[:, 3], vars[:, 4], vars[:, 5]
-#     res = 1/0
-       
-#     if boundary:
-#         return res
-#     else: 
-#         return res[...,1:-1,1:-1,1:-1]
+
+#Gauss Law
+def residual_gauss(vars, boundary=False):
+    Bx, By = vars[:, 4], vars[:, 5]
+    res = D_x(Bx) + D_y(By)
+    
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1,1:-1]
 
 # %% 
 #Load the trained Model
@@ -325,14 +326,18 @@ print('Calibration Error (MAE) : %.3e' % (mae))
 # cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
 # cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
-# #Using Gauss Law
-# cal_pred_residual = residual_gauss(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_gauss(cal_out.permute(0,1,4,2,3)) #Data-Driven
+#Using Energy Equation
+# cal_pred_residual = residual_energy(cal_pred.permute(0,1,4,2,3)) 
+# cal_out_residual = residual_energy(cal_out.permute(0,1,4,2,3)) #Data-Driven
+
 
 # Using Induction
 cal_pred_residual = residual_induction(cal_pred.permute(0,1,4,2,3)) 
 cal_out_residual = residual_induction(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
+# #Using Gauss Law
+# cal_pred_residual = residual_gauss(cal_pred.permute(0,1,4,2,3)) 
+# cal_out_residual = residual_gauss(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
 ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 
@@ -352,13 +357,17 @@ pred_pred = out_normalizer.decode(pred_pred)
 # pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
 # val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
 
-# # #Using Gauss Law
-# pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
+# # Using Energy equation
+# pred_residual = residual_energy(pred_pred.permute(0,1,4,2,3)) #Prediction
+# val_residual = residual_energy(pred_out.permute(0,1,4,2,3)) #Data
 
 # #Using Induction Law
 pred_residual = residual_induction(pred_pred.permute(0,1,4,2,3)) #Prediction
 val_residual = residual_induction(pred_out.permute(0,1,4,2,3)) #Data
+
+# # #Using Gauss Law
+# pred_residual = residual_gauss(pred_pred.permute(0,1,4,2,3)) #Prediction
+# val_residual = residual_gauss(pred_out.permute(0,1,4,2,3)) #Data
 
 
 #Emprical Coverage for all values of alpha 

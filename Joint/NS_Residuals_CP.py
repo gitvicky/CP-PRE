@@ -282,9 +282,9 @@ print('Calibration Error (MAE) : %.3e' % (mae))
 cal_pred_residual = residual_continuity(cal_pred.permute(0,1,4,2,3)) 
 cal_out_residual = residual_continuity(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
-# #Using the Momentum Equation. 
-# cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
-# cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
+#Using the Momentum Equation. 
+cal_pred_residual = residual_momentum(cal_pred.permute(0,1,4,2,3)) 
+cal_out_residual = residual_momentum(cal_out.permute(0,1,4,2,3)) #Data-Driven
 
 modulation = modulation_func(cal_out_residual.numpy(), cal_pred_residual.numpy())
 ncf_scores = ncf_metric_joint(cal_out_residual.numpy(), cal_pred_residual.numpy(), modulation)
@@ -300,9 +300,9 @@ pred_pred = out_normalizer.decode(pred_pred)
 pred_residual = residual_continuity(pred_pred.permute(0,1,4,2,3)) #Prediction
 val_residual = residual_continuity(pred_out.permute(0,1,4,2,3)) #Data
 
-# #Using the Momentum Equation. 
-# pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
-# val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
+#Using the Momentum Equation. 
+pred_residual = residual_momentum(pred_pred.permute(0,1,4,2,3)) #Prediction
+val_residual = residual_momentum(pred_out.permute(0,1,4,2,3)) #Data
 
 #Emprical Coverage for all values of alpha 
 alpha_levels = np.arange(0.05, 0.95, 0.1)
@@ -427,6 +427,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -435,7 +436,7 @@ ax.set_yticks([])
 # Set labels and title
 ax.set_xlabel(r'$x$', fontsize=36)
 ax.set_ylabel(r'$y$', fontsize=36)
-ax.set_title(r'PRE $D(u)$', fontsize=36)
+ax.set_title(r'PRE: $D_{cont}(u,v)$', fontsize=36)
 
 # plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/ns_residual_cont.svg", format="svg",transparent=True, bbox_inches='tight')
 plt.show()
@@ -459,6 +460,7 @@ cbar.formatter = ticker.ScalarFormatter(useMathText=True)
 cbar.formatter.set_scientific(True)
 cbar.formatter.set_powerlimits((0, 0))
 cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
 
 # Remove ticks
 ax.set_xticks([])
@@ -469,8 +471,8 @@ ax.set_xlabel(r'$x$', fontsize=36)
 ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Joint CP ($+\hat q \times mod)$', fontsize=36)
 
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_ns_cont_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_ns_cont_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_ns_mom_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_ns_mom_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
 
 plt.show()
 
