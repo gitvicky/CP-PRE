@@ -308,7 +308,7 @@ print(f'{sum(filtered_sims)} simulations rejected')
 
 # %% 
 #Plotting Coverage
-alpha = 0.1
+alpha = 0.75
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets =  [- qhat*modulation, + qhat*modulation]
 
@@ -320,8 +320,10 @@ values = {"Residual": pred_residual[idx],
           "Upper": prediction_sets[1]
           }
 
-indices = [2, 3, 6, 7]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
+indices = [5, 10, 15, 20]
+subplots_1d(x_values, values, indices, "Joint CP (25% coverage)")
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_burgers_" + str(alpha) + "_.pdf", format="pdf", bbox_inches='tight')
+
 # %%
 #Paper Plots 
 alpha = 0.1

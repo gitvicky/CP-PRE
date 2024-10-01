@@ -281,22 +281,22 @@ plt.legend()
 
 # %% 
 #Plotting Coverage
-alpha = 0.1
+alpha = 0.5
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-prediction_sets = [pred_residual.numpy() - qhat, + pred_residual.numpy() + qhat]
+prediction_sets =  [- qhat, + qhat]
 
 from Utils.plot_tools import subplots_1d
 x_values = x[1:-1]
 idx = 5
-values = {
-        "Pred. Residual": test_pred_residual[idx], 
-          "Val. Residual": test_val_residual[idx], 
-          "Lower": prediction_sets[0][idx],
-          "Upper": prediction_sets[1][idx]
+values = {"Residual": pred_residual[idx],
+          "Lower": prediction_sets[0],
+          "Upper": prediction_sets[1]
           }
 
-indices = [2, 3, 4, 5]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
+indices = [1, 3, 5, 7]
+subplots_1d(x_values, values, indices, "Marginal CP (50% coverage)")
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_" + str(alpha) + "_.pdf", format="pdf", bbox_inches='tight')
+
 
 #%%
 ###################################################################

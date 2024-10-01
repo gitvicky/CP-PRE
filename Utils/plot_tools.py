@@ -1,3 +1,4 @@
+import os 
 import matplotlib.pyplot as plt
 from matplotlib import pyplot as plt 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -84,12 +85,12 @@ def subplots_1d(x_values, y_values, indices, title=None):
         #               color='blue', label=list(y_values.keys())[1])        
         # Set the title and labels for the subplot
         axes[ii].set_title("t = " + str(idx))
-        axes[ii].set_xlabel('X')
-        axes[ii].set_ylabel('Y')
+        axes[ii].set_xlabel('x')
+        axes[ii].set_ylabel('u')
         axes[ii].legend()
         
         # Set the grid
-        axes[ii].grid(True)
+        # axes[ii].grid(True)
     
     # Remove any unused subplots
     for i in range(num_subplots, len(axes)):
@@ -99,5 +100,5 @@ def subplots_1d(x_values, y_values, indices, title=None):
     # Adjust the spacing between subplots
     plt.tight_layout()
     
-    # Display the plot
-    plt.show()
+    # # Display the plot
+    # plt.show()

@@ -337,7 +337,7 @@ print(f'{sum(filtered_sims)} simulations rejected')
 
 # %%
 #Plotting Coverage
-alpha = 0.1
+alpha = 0.5
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
 prediction_sets =  [- qhat*modulation, + qhat*modulation]
 
@@ -349,8 +349,9 @@ values = {"Residual": pred_residual[idx],
           "Upper": prediction_sets[1]
           }
 
-indices = [2, 3, 6, 7]
-subplots_1d(x_values, values, indices, "CP within the residual space.")
+indices = [1, 3, 5, 7]
+subplots_1d(x_values, values, indices, "Joint CP (50% coverage)")
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_advection_" + str(alpha) + "_.pdf", format="pdf", bbox_inches='tight')
 
 # %%
 #Paper Plots 
