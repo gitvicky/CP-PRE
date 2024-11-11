@@ -13,15 +13,15 @@ A framework for providing calibrated, physics-informed uncertainty estimates for
 ## Repository Structure
 
 ```
-├── Active_Learning/        # Active learning experiments
+├── Active_Learning/       # Active learning experiments
 ├── Expts_initial/         # Initial experiments
 ├── Joint/                 # Joint conformal prediction implementation
-├── Marginal/             # Marginal conformal prediction implementation
-├── Neural_PDE/           # Neural PDE solver implementations
-├── Physics_Informed/     # Physics-informed components
-├── Tests/                # Test suite
-├── Utils/                # Utility functions
-└── __pycache__/         # Python cache files
+├── Marginal/              # Marginal conformal prediction implementation
+├── Neural_PDE/            # Neural PDE solver implementations
+├── Physics_Informed/      # Physics-informed components
+├── Tests/                 # Test suite
+├── Utils/                 # Utility functions
+└── __pycache__/           # Python cache files
 ```
 
 ## Experiments
