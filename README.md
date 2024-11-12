@@ -52,9 +52,11 @@ The repository includes implementations for the following PDEs:
 
 ## Requirements
 
+- Numpy
+- Scipy
 - PyTorch
+- Matplotlib
 - NumPy
-- SciPy
 - tqdm
 
 ## Usage
