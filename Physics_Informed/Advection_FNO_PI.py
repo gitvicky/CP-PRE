@@ -223,8 +223,6 @@ loss_func = residual_loss
 if device == 'cuda':
     u_normalizer.cuda()
 
-
-
 start_time = default_timer()
 for ep in range(epochs): #Training Loop - Epochwise
 
@@ -242,9 +240,6 @@ for ep in range(epochs): #Training Loop - Epochwise
     scheduler.step()
 
 train_time = default_timer() - start_time
-
-
-
 
 
 # start_time = default_timer()

@@ -175,7 +175,6 @@ def residual_momentum_vector(vars, boundary=False):
     else: 
         return res[...,1:-1,1:-1,1:-1]
     
-
 # %% #Checking continuity 
 res_cont = residual_continuity(vars)
 res_cont_vect = residual_continuity_vector(vars)

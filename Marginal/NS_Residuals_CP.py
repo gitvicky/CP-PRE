@@ -61,7 +61,7 @@ from Utils.plot_tools import subplots_2d
 #Setting up locations. 
 file_loc = os.getcwd()
 data_loc = os.path.dirname(os.getcwd()) + '/Neural_PDE/Data'
-model_loc = file_loc + '/Weights'
+model_loc = os.path.dirname(os.getcwd()) + '/Weights'
 plot_loc = file_loc + '/Plots'
 #Setting up the seeds and devices
 torch.manual_seed(0)
