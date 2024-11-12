@@ -180,15 +180,15 @@ residual_momy_cal = D_t(v) + u*D_y(v) + v*D_y(v) - nu*D_xx_yy(v) + D_y(p)
 # residual_momy_cal = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx #Rescaling
 
 # %% 
-# #Using Vector Operations 
-# from Utils.VectorConvOps import *
-# div = Divergence() 
-# residual_cont_cal = div(u, v)
+#Using Vector Operations 
+from Utils.VectorConvOps import *
+div = Divergence() 
+residual_cont_cal = div(u, v)
 
-# grad = Gradient()
-# laplace = Laplace()
-# grad_time = Gradient(domain=('t', 't'))
-# residual_mom_cal = grad_time(u,v) + vectorize(dot(vectorize(u,v), grad(u)), dot(vectorize(u,v), grad(v))) - nu*laplace(u,v) + grad(p)
+grad = Gradient()
+laplace = Laplace()
+grad_time = Gradient(domain=('t', 't'))
+residual_mom_cal = grad_time(u,v) + vectorize(dot(vectorize(u,v), grad(u)), dot(vectorize(u,v), grad(v))) - nu*laplace(u,v) + grad(p)
 
 # %% 
 # Example values to plot

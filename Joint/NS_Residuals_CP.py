@@ -232,7 +232,7 @@ def residual_momentum(vars, boundary=False):
     u, v, p = vars[:,0], vars[:, 1], vars[:, 2]
 
     res_x = D_t(u)*dx*dy + u*D_x(u)*dt*dy + v*D_y(u)*dt*dx - nu*D_xx_yy(u)*dt + D_x(p)*dt*dy
-    res_y = D_t(v)*dx*dy + u*D_y(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx
+    res_y = D_t(v)*dx*dy + u*D_x(v)*dt*dx + v*D_y(v)*dt*dy - nu*D_xx_yy(v)*dt + D_y(p)*dt*dx
 
     if boundary:
         return res_x + res_y
