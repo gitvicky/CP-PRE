@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FNO modelled over the 2D Wave Equation auto-regressively 
+U-Net modelled over the 2D Wave Equation auto-regressively 
 
 Equation: u_tt = D*(u_xx + u_yy), D=1.0
 
@@ -10,7 +10,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 # %%
 configuration = {"Case": 'Wave',
                  "Field": 'u',
-                 "Model": 'FNO',
+                 "Model": 'UNet',
                  "Epochs": 500,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
@@ -20,25 +20,25 @@ configuration = {"Case": 'Wave',
                  "Activation": 'GeLU',
                  "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
-                 "T_in": 1,    
+                 "T_in": 20,    
                  "T_out": 60,
-                 "Step": 1,
+                 "Step": 10,
                  "Width_time": 32, 
                  "Width_vars": 0,  
                  "Modes": 8,
                  "Variables":1, 
                  "Loss Function": 'LP',
-                 "UQ": 'Deterministic', #None, Dropout
+                 "UQ": 'None', #None, Dropout
                  }
 
 # %%
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE/Rebuttal", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave', configuration['UQ']], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'U-Net', 'Tests', 'AR'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
-run.save_file(os.path.abspath(__file__), 'code')
+run.save(os.path.abspath(__file__), 'code')
 import git
 repo = git.Repo(search_parent_directories=True)
 sha = repo.head.object.hexsha
@@ -61,9 +61,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 # %%
 #Importing the models and utilities. 
-from Models.Base_FNO import *
-from neuralPDE.Utils.processing_utils import * 
-from Training_utils import * 
+from Neural_PDE.Models.UNet import *
+from Neural_PDE.Utils.processing_utils import * 
+from Neural_PDE.Utils.training_utils import * 
 
 # %% 
 #Settung up locations. 
@@ -75,6 +75,7 @@ plot_loc = file_loc + '/Plots'
 torch.manual_seed(0)
 np.random.seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.set_default_dtype(torch.float32)
 
 # %%
 ################################################################
@@ -93,9 +94,9 @@ u = torch.from_numpy(u_sol)
 u = u.permute(0, 2, 3, 1)
 u = torch.unsqueeze(u, 1)
 # %% 
-ntrain = 500
-ntest = 500
-S = 64 #Grid Size
+ntrain = 800
+ntest = 200
+S = 33 #Grid Size
 
 #Extracting configuration files
 T_in = configuration['T_in']
@@ -133,22 +134,21 @@ elif norm_strategy == 'Gaussian':
 a_normalizer = normalizer(train_a)
 u_normalizer = normalizer(train_u)
 
-# %% 
 train_a = a_normalizer.encode(train_a)
 test_a = a_normalizer.encode(test_a)
 
 train_u = u_normalizer.encode(train_u)
 test_u_encoded = u_normalizer.encode(test_u)
-# %%
+
 #Saving Normalisation 
-saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
+saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '_' + 'norms.npz'
 
 np.savez(saved_normalisations, 
         in_a=a_normalizer.a.numpy(), in_b=a_normalizer.b.numpy(), 
         out_a=u_normalizer.a.numpy(), out_b=u_normalizer.b.numpy()
         )
 
-run.save_file(saved_normalisations, 'output')
+run.save(saved_normalisations, 'output')
 # %%
 #Setting up the data loaders. 
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_a, train_u), batch_size=batch_size, shuffle=True)
@@ -162,8 +162,7 @@ print('preprocessing finished, time used:', t2-t1)
 # training and evaluation
 ################################################################
 
-model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-# model.load_state_dict(torch.load(model_loc + '/FNO_Wave_null-shape.pth', map_location='cpu'))
+model = UNet2d(in_channels=T_in, out_channels=step, init_features=width_time, num_vars=configuration['Variables'])
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -184,7 +183,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
     t2 = default_timer()
 
     train_loss = train_loss / ntrain / num_vars
@@ -197,16 +196,16 @@ for ep in range(epochs): #Training Loop - Epochwise
 
 train_time = default_timer() - start_time
 
+
 # %%
 #Saving the Model
 saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '.pth'
-
 torch.save( model.state_dict(), saved_model)
-run.save_file(saved_model, 'output')
+run.save(saved_model, 'output')
 # %%
 #Validation
-pred_set_encoded, mse, mae = validation(model, test_a, test_u_encoded, step, T_out)
-# %%
+pred_set_encoded, mse, mae = validation_AR(model, test_a, test_u_encoded, step, T_out)
+
 print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
 
@@ -267,7 +266,7 @@ u_field = pred_set[idx]
 
 ax = fig.add_subplot(2, 3, 4)
 pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-ax.set_ylabel('FNO')
+ax.set_ylabel('U-Net')
 
 fig.colorbar(pcm, pad=0.05)
 
@@ -287,7 +286,7 @@ fig.colorbar(pcm, pad=0.05)
 
 plot_name = plot_loc + '/' + configuration['Field'] + '_' + run.name + '.png'
 plt.savefig(plot_name)
-run.save_file(plot_name, 'output')
+run.save(plot_name, 'output')
 
 run.close()
 # %%

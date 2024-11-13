@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FNO modelled over the 2D Wave Equation auto-regressively 
-
-Equation: u_tt = D*(u_xx + u_yy), D=1.0
+FNO modelled over the 2D Navier-Stokes equations auto-regressively 
 
 """
 
 # %%
-configuration = {"Case": 'Wave',
-                 "Field": 'u',
+configuration = {"Case": 'Navier-Stokes',
+                 "Field": 'u, v, p, w',
                  "Model": 'FNO',
-                 "Epochs": 500,
+                 "Epochs": 250,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -21,21 +19,21 @@ configuration = {"Case": 'Wave',
                  "Physics Normalisation": 'No',
                  "Normalisation Strategy": 'Min-Max',
                  "T_in": 1,    
-                 "T_out": 60,
+                 "T_out": 20,
                  "Step": 1,
-                 "Width_time": 32, 
+                 "Width_time": 16, 
                  "Width_vars": 0,  
                  "Modes": 8,
-                 "Variables":1, 
+                 "Variables":4, 
                  "Loss Function": 'LP',
-                 "UQ": 'Deterministic', #None, Dropout
+                 "UQ": 'None', #None, Dropout
                  }
 
 # %%
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE/Rebuttal", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave', configuration['UQ']], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'NS'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
 run.save_file(os.path.abspath(__file__), 'code')
@@ -61,9 +59,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 # %%
 #Importing the models and utilities. 
-from Models.Base_FNO import *
-from neuralPDE.Utils.processing_utils import * 
-from Training_utils import * 
+from Neural_PDE.Models.FNO import *
+from Neural_PDE.Utils.processing_utils import * 
+from Neural_PDE.Utils.training_utils import * 
 
 # %% 
 #Settung up locations. 
@@ -71,6 +69,7 @@ file_loc = os.getcwd()
 data_loc = os.path.dirname(os.getcwd()) + '/Data'
 model_loc = file_loc + '/Weights'
 plot_loc = file_loc + '/Plots'
+
 #Setting up the seeds and devices
 torch.manual_seed(0)
 np.random.seed(0)
@@ -83,19 +82,32 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # %%
 t1 = default_timer()
-data =  np.load(data_loc + '/Spectral_Wave_data_LHS.npz')
+data =  np.load(data_loc + '/NS_Spectral_combined.npz')
 
-u_sol = data['u'].astype(np.float32)
+u = data['u'].astype(np.float32)[:, ::2]
+v = data['v'].astype(np.float32)[:, ::2]
+p = data['p'].astype(np.float32)[:, ::2]
+w = data['w'].astype(np.float32)[:, ::2]
 x = data['x'].astype(np.float32)
-y = data['y'].astype(np.float32)
-t = data['t'].astype(np.float32)
-u = torch.from_numpy(u_sol)
-u = u.permute(0, 2, 3, 1)
-u = torch.unsqueeze(u, 1)
+y = data['x'].astype(np.float32)
+dt = data['dt'].astype(np.float32) * 2 
+
+def stacked_fields(variables):
+    stack = []
+    for var in variables:
+        var = torch.from_numpy(var) #Converting to Torch
+        var = var.permute(0, 2, 3, 1) #Permuting to be BS, Nx, Ny, Nt
+        stack.append(var)
+    stack = torch.stack(stack, dim=1)
+    return stack
+
+vars = stacked_fields([u,v,p,w])
+
+field = ['u', 'v', 'p', 'w']
+
 # %% 
-ntrain = 500
-ntest = 500
-S = 64 #Grid Size
+ntrain = 200
+ntest = 200
 
 #Extracting configuration files
 T_in = configuration['T_in']
@@ -109,11 +121,11 @@ num_vars = configuration['Variables']
 batch_size = configuration['Batch Size']
 
 #Setting up train and test
-train_a = u[:ntrain,:,:,:,:T_in]
-train_u = u[:ntrain,:,:,:,T_in:T_out+T_in]
+train_a = vars[:ntrain,...,:T_in]
+train_u = vars[:ntrain,...,T_in:T_out+T_in]
 
-test_a = u[-ntest:,:,:,:,:T_in]
-test_u = u[-ntest:,:,:,:,T_in:T_out+T_in]
+test_a = vars[-ntest:,...,:T_in]
+test_u = vars[-ntest:,...,T_in:T_out+T_in]
 
 print("Training Input: " + str(train_a.shape))
 print("Training Output: " + str(train_u.shape))
@@ -133,13 +145,12 @@ elif norm_strategy == 'Gaussian':
 a_normalizer = normalizer(train_a)
 u_normalizer = normalizer(train_u)
 
-# %% 
 train_a = a_normalizer.encode(train_a)
 test_a = a_normalizer.encode(test_a)
 
 train_u = u_normalizer.encode(train_u)
 test_u_encoded = u_normalizer.encode(test_u)
-# %%
+
 #Saving Normalisation 
 saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
 
@@ -163,7 +174,6 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 
 model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-# model.load_state_dict(torch.load(model_loc + '/FNO_Wave_null-shape.pth', map_location='cpu'))
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -184,7 +194,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
     t2 = default_timer()
 
     train_loss = train_loss / ntrain / num_vars
@@ -197,18 +207,18 @@ for ep in range(epochs): #Training Loop - Epochwise
 
 train_time = default_timer() - start_time
 
+
 # %%
 #Saving the Model
 saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '.pth'
-
 torch.save( model.state_dict(), saved_model)
 run.save_file(saved_model, 'output')
 # %%
 #Validation
-pred_set_encoded, mse, mae = validation(model, test_a, test_u_encoded, step, T_out)
+pred_set_encoded, mse, mae = validation_AR(model, test_a, test_u_encoded, step, T_out)
 # %%
-print('Testing Error (MSE) : %.3e' % (mse))
-print('Testing Error (MAE) : %.3e' % (mae))
+print('(MSE) Testing Error: %.3e' % (mse))
+print('(MAE) Testing Error: %.3e' % (mae))
 
 run.update_metadata({'Training Time': float(train_time),
                      'MSE Test Error': float(mse),
@@ -223,71 +233,70 @@ pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()
 #Plotting performance
 
 idx = np.random.randint(0,ntest) 
-idx = 5
+idx = 0
 
 # %%
+for var in range(num_vars):
+    u_field = test_u[idx][var]
+        
+    v_min_1 = torch.min(u_field[0,...,0])
+    v_max_1 = torch.max(u_field[0,..., 0])
 
-u_field = test_u[idx]
-    
-v_min_1 = torch.min(u_field[0, :, :, 0])
-v_max_1 = torch.max(u_field[0, :, :, 0])
+    v_min_2 = torch.min(u_field[0, ..., int(T_out/ 2)])
+    v_max_2 = torch.max(u_field[0, ..., int(T_out/ 2)])
 
-v_min_2 = torch.min(u_field[0, :, :, int(T_out/ 2)])
-v_max_2 = torch.max(u_field[0, :, :, int(T_out/ 2)])
+    v_min_3 = torch.min(u_field[0, ..., -1])
+    v_max_3 = torch.max(u_field[0, ..., -1])
 
-v_min_3 = torch.min(u_field[0, :, :, -1])
-v_max_3 = torch.max(u_field[0, :, :, -1])
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+    ax = fig.add_subplot(2, 3, 1)
+    pcm = ax.imshow(u_field[..., 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    # ax.title.set_text('Initial')
+    ax.title.set_text('t=' + str(T_in))
+    ax.set_ylabel('Solution -  ' + configuration['Field'][var])
+    fig.colorbar(pcm, pad=0.05)
 
-fig = plt.figure(figsize=plt.figaspect(0.5))
-ax = fig.add_subplot(2, 3, 1)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-# ax.title.set_text('Initial')
-ax.title.set_text('t=' + str(T_in))
-ax.set_ylabel('Solution')
-fig.colorbar(pcm, pad=0.05)
+    ax = fig.add_subplot(2, 3, 2)
+    pcm = ax.imshow(u_field[..., int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
+                    vmax=v_max_2)
+    # ax.title.set_text('Middle')
+    ax.title.set_text('t=' + str(int((T_out+ T_in) / 2)))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
 
-ax = fig.add_subplot(2, 3, 2)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-# ax.title.set_text('Middle')
-ax.title.set_text('t=' + str(int((T_out+ T_in) / 2)))
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
+    ax = fig.add_subplot(2, 3, 3)
+    pcm = ax.imshow(u_field[..., -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    # ax.title.set_text('Final')
+    ax.title.set_text('t=' + str(T_out+ T_in))
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
 
-ax = fig.add_subplot(2, 3, 3)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-# ax.title.set_text('Final')
-ax.title.set_text('t=' + str(T_out+ T_in))
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
+    u_field = pred_set[idx][var]
 
-u_field = pred_set[idx]
+    ax = fig.add_subplot(2, 3, 4)
+    pcm = ax.imshow(u_field[..., 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
+    ax.set_ylabel('FNO' )
 
-ax = fig.add_subplot(2, 3, 4)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-ax.set_ylabel('FNO')
+    fig.colorbar(pcm, pad=0.05)
 
-fig.colorbar(pcm, pad=0.05)
+    ax = fig.add_subplot(2, 3, 5)
+    pcm = ax.imshow(u_field[..., int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
+                    vmax=v_max_2)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
 
-ax = fig.add_subplot(2, 3, 5)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
+    ax = fig.add_subplot(2, 3, 6)
+    pcm = ax.imshow(u_field[..., -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
+    ax.axes.xaxis.set_ticks([])
+    ax.axes.yaxis.set_ticks([])
+    fig.colorbar(pcm, pad=0.05)
 
-ax = fig.add_subplot(2, 3, 6)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
-
-plot_name = plot_loc + '/' + configuration['Field'] + '_' + run.name + '.png'
-plt.savefig(plot_name)
-run.save_file(plot_name, 'output')
+    plot_name = plot_loc + '/' + field[var] + '_' + run.name + '.png'
+    plt.savefig(plot_name)
+    run.save_file(plot_name, 'output')
 
 run.close()
 # %%

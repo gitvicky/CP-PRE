@@ -1,50 +1,49 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-FNO modelled over the 2D Wave Equation auto-regressively 
+Created on 7 June 2024
 
-Equation: u_tt = D*(u_xx + u_yy), D=1.0
+Obtaining the Physics Residuals as a measure of UQ on U-Net surrogate for the 1D convection Diffusion Equation. 
+
+Equation: 
+u_t = D.u_xx +u.D_x - c.u_x
+with spatially varying diffusion coefficient (sin(x/damping_factor)).
 
 """
 
-# %%
-configuration = {"Case": 'Wave',
+#%%
+#Training Configuration - used as the config file for simvue.
+configuration = {"Case": 'Conv-Diff',
                  "Field": 'u',
                  "Model": 'FNO',
                  "Epochs": 500,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
-                 "Learning Rate": 0.005,
+                 "Learning Rate": 0.001,
                  "Scheduler Step": 100,
                  "Scheduler Gamma": 0.5,
-                 "Activation": 'GeLU',
-                 "Physics Normalisation": 'No',
-                 "Normalisation Strategy": 'Min-Max',
-                 "T_in": 1,    
-                 "T_out": 60,
-                 "Step": 1,
-                 "Width_time": 32, 
-                 "Width_vars": 0,  
+                 "Activation": 'Tanh',
+                 "Normalisation Strategy": 'Identity',
+                 "T_in": 30,    
+                 "T_out": 50,
+                 "Step": 50,
+                 "Width": 32, 
                  "Modes": 8,
                  "Variables":1, 
-                 "Loss Function": 'LP',
-                 "UQ": 'Deterministic', #None, Dropout
+                 "Noise":0.0, 
+                 "Loss Function": 'MSE',
                  }
 
-# %%
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE/Rebuttal", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave', configuration['UQ']], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'AR'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
-run.save_file(os.path.abspath(__file__), 'code')
+run.save(os.path.abspath(__file__), 'code')
 import git
 repo = git.Repo(search_parent_directories=True)
 sha = repo.head.object.hexsha
 run.update_metadata({'Git Hash': sha})
 
-# %% 
 #Importing the necessary packages
 import sys
 import numpy as np
@@ -61,12 +60,12 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 # %%
 #Importing the models and utilities. 
-from Models.Base_FNO import *
-from neuralPDE.Utils.processing_utils import * 
-from Training_utils import * 
+from Neural_PDE.Models.FNO import *
+from Neural_PDE.Utils.processing_utils import * 
+from Neural_PDE.Utils.training_utils import * 
 
 # %% 
-#Settung up locations. 
+#Setting up locations. 
 file_loc = os.getcwd()
 data_loc = os.path.dirname(os.getcwd()) + '/Data'
 model_loc = file_loc + '/Weights'
@@ -75,48 +74,47 @@ plot_loc = file_loc + '/Plots'
 torch.manual_seed(0)
 np.random.seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.set_default_dtype(torch.float32)
 
+# %% 
 # %%
 ################################################################
 # Loading Data 
 ################################################################
 
-# %%
 t1 = default_timer()
-data =  np.load(data_loc + '/Spectral_Wave_data_LHS.npz')
-
-u_sol = data['u'].astype(np.float32)
-x = data['x'].astype(np.float32)
-y = data['y'].astype(np.float32)
-t = data['t'].astype(np.float32)
-u = torch.from_numpy(u_sol)
-u = u.permute(0, 2, 3, 1)
-u = torch.unsqueeze(u, 1)
+data =  np.load(data_loc + '/ConvDiff_u_1.npz')
+u_sol  = data['u']
+x = data['x']
+dt = data['dt']
 # %% 
-ntrain = 500
-ntest = 500
-S = 64 #Grid Size
+u = torch.tensor(u_sol, dtype=torch.float32)
+u = u.permute(0, 2, 1) #only for FNO
+u = u.unsqueeze(1)
+x_grid = x
+# %% 
+ntrain = 800
+ntest = 200
 
 #Extracting configuration files
 T_in = configuration['T_in']
 T_out = configuration['T_out']
 step = configuration['Step']
+width = configuration['Width']
 modes = configuration['Modes']
-width_vars = configuration['Width_vars']
-width_time = configuration['Width_time']
 output_size = configuration['Step']
 num_vars = configuration['Variables']
 batch_size = configuration['Batch Size']
 
-#Setting up train and test
-train_a = u[:ntrain,:,:,:,:T_in]
-train_u = u[:ntrain,:,:,:,T_in:T_out+T_in]
+train_a = u[:ntrain,:, :, :T_in]
+train_u = u[:ntrain,:, :, T_in:T_out+T_in]
 
-test_a = u[-ntest:,:,:,:,:T_in]
-test_u = u[-ntest:,:,:,:,T_in:T_out+T_in]
+test_a = u[-ntest:, :, :, :T_in]
+test_u = u[-ntest:, :, :, T_in:T_out+T_in]
 
 print("Training Input: " + str(train_a.shape))
 print("Training Output: " + str(train_u.shape))
+
 
 # %%
 #Normalising the train and test datasets with the preferred normalisation. 
@@ -129,28 +127,29 @@ elif norm_strategy == 'Range':
     normalizer = RangeNormalizer
 elif norm_strategy == 'Gaussian':
     normalizer = GaussianNormalizer
+elif norm_strategy == 'Identity':
+    normalizer = Identity
 
 a_normalizer = normalizer(train_a)
 u_normalizer = normalizer(train_u)
 
-# %% 
 train_a = a_normalizer.encode(train_a)
 test_a = a_normalizer.encode(test_a)
 
 train_u = u_normalizer.encode(train_u)
 test_u_encoded = u_normalizer.encode(test_u)
-# %%
+
 #Saving Normalisation 
-saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' + run.name + '_' + 'norms.npz'
+saved_normalisations = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '_' + 'norms.npz'
 
 np.savez(saved_normalisations, 
         in_a=a_normalizer.a.numpy(), in_b=a_normalizer.b.numpy(), 
         out_a=u_normalizer.a.numpy(), out_b=u_normalizer.b.numpy()
         )
 
-run.save_file(saved_normalisations, 'output')
+run.save(saved_normalisations, 'output')
 # %%
-#Setting up the data loaders. 
+#Setting up the training and testing data splits
 train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_a, train_u), batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u_encoded), batch_size=batch_size, shuffle=False)
 
@@ -161,9 +160,7 @@ print('preprocessing finished, time used:', t2-t1)
 ################################################################
 # training and evaluation
 ################################################################
-
-model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
-# model.load_state_dict(torch.load(model_loc + '/FNO_Wave_null-shape.pth', map_location='cpu'))
+model = FNO_multi1d(T_in, step, modes, num_vars, width, width_vars=0)
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})
@@ -172,7 +169,7 @@ print("Number of model params : " + str(model.count_params()))
 #Setting up the optimizer and scheduler, loss and epochs 
 optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
-loss_func = LpLoss(size_average=False)
+loss_func = torch.nn.MSELoss()
 epochs = configuration['Epochs']
 
 # %%
@@ -184,7 +181,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer)
     t2 = default_timer()
 
     train_loss = train_loss / ntrain / num_vars
@@ -197,16 +194,17 @@ for ep in range(epochs): #Training Loop - Epochwise
 
 train_time = default_timer() - start_time
 
+
 # %%
 #Saving the Model
 saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '.pth'
-
 torch.save( model.state_dict(), saved_model)
-run.save_file(saved_model, 'output')
+run.save(saved_model, 'output')
+
 # %%
-#Validation
-pred_set_encoded, mse, mae = validation(model, test_a, test_u_encoded, step, T_out)
-# %%
+#Testing 
+pred_set_encoded, mse, mae = validation_AR(model, test_a, test_u_encoded, step, T_out)
+
 print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
 
@@ -215,79 +213,49 @@ run.update_metadata({'Training Time': float(train_time),
                      'MAE Test Error': float(mae)
                     })
 
-#%%
+# %% 
 #Denormalising the predictions
 pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()
 
-# %% 
-#Plotting performance
+# %%
+#Plotting the surrogate performance against that of the test data. 
 
 idx = np.random.randint(0,ntest) 
-idx = 5
+x_range = x_grid
 
-# %%
+u_field_actual = test_u[idx, 0]
+u_field_pred = pred_set[idx, 0]
 
-u_field = test_u[idx]
-    
-v_min_1 = torch.min(u_field[0, :, :, 0])
-v_max_1 = torch.max(u_field[0, :, :, 0])
+v_min = torch.min(u_field_actual)
+v_max = torch.max(u_field_actual)
 
-v_min_2 = torch.min(u_field[0, :, :, int(T_out/ 2)])
-v_max_2 = torch.max(u_field[0, :, :, int(T_out/ 2)])
-
-v_min_3 = torch.min(u_field[0, :, :, -1])
-v_max_3 = torch.max(u_field[0, :, :, -1])
 
 fig = plt.figure(figsize=plt.figaspect(0.5))
-ax = fig.add_subplot(2, 3, 1)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-# ax.title.set_text('Initial')
-ax.title.set_text('t=' + str(T_in))
-ax.set_ylabel('Solution')
-fig.colorbar(pcm, pad=0.05)
+ax = fig.add_subplot(1,3,1)
+pcm = ax.plot(x_range, u_field_actual[:, 0], color='green')
+pcm = ax.plot(x_range, u_field_pred[:, 0], color='firebrick')
+ax.set_ylim([v_min, v_max])
+ax.title.set_text('t='+ str(T_in))
 
-ax = fig.add_subplot(2, 3, 2)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-# ax.title.set_text('Middle')
-ax.title.set_text('t=' + str(int((T_out+ T_in) / 2)))
-ax.axes.xaxis.set_ticks([])
+ax = fig.add_subplot(1,3,2)
+pcm = ax.plot(x_range, u_field_actual[:,int(T_out/2)], color='green')
+pcm = ax.plot(x_range, u_field_pred[:, int(T_out/2)], color='firebrick')
+ax.set_ylim([v_min, v_max])
+ax.title.set_text('t='+ str(int((T_out+(T_in/2)))))
 ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
 
-ax = fig.add_subplot(2, 3, 3)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-# ax.title.set_text('Final')
-ax.title.set_text('t=' + str(T_out+ T_in))
-ax.axes.xaxis.set_ticks([])
+ax = fig.add_subplot(1,3,3)
+pcm = ax.plot(x_range, u_field_actual[:, -1], color='green')
+pcm = ax.plot(x_range, u_field_pred[:, -1], color='firebrick')
+ax.title.set_text('t='+str(T_out+T_in))
+ax.set_ylim([v_min, v_max])
 ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
-u_field = pred_set[idx]
-
-ax = fig.add_subplot(2, 3, 4)
-pcm = ax.imshow(u_field[0, :, :, 0], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_1, vmax=v_max_1)
-ax.set_ylabel('FNO')
-
-fig.colorbar(pcm, pad=0.05)
-
-ax = fig.add_subplot(2, 3, 5)
-pcm = ax.imshow(u_field[0, :, :, int(T_out/ 2)], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_2,
-                vmax=v_max_2)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
-ax = fig.add_subplot(2, 3, 6)
-pcm = ax.imshow(u_field[0, :, :, -1], cmap=matplotlib.cm.coolwarm, extent=[9.5, 10.5, -0.5, 0.5], vmin=v_min_3, vmax=v_max_3)
-ax.axes.xaxis.set_ticks([])
-ax.axes.yaxis.set_ticks([])
-fig.colorbar(pcm, pad=0.05)
-
 
 plot_name = plot_loc + '/' + configuration['Field'] + '_' + run.name + '.png'
 plt.savefig(plot_name)
-run.save_file(plot_name, 'output')
+run.save(plot_name, 'output')
+
 
 run.close()
+
 # %%

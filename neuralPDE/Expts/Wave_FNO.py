@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 500,
+                 "Epochs": 250,
                  "Batch Size": 50,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -28,14 +28,14 @@ configuration = {"Case": 'Wave',
                  "Modes": 8,
                  "Variables":1, 
                  "Loss Function": 'LP',
-                 "UQ": 'Deterministic', #None, Dropout
+                 "UQ": 'None', #None, Dropout
                  }
 
 # %%
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE/Rebuttal", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave', configuration['UQ']], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'PIUQ', 'AR', 'Wave'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
 run.save_file(os.path.abspath(__file__), 'code')
@@ -61,9 +61,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 # %%
 #Importing the models and utilities. 
-from Models.Base_FNO import *
-from neuralPDE.Utils.processing_utils import * 
-from Training_utils import * 
+from Neural_PDE.Models.FNO import *
+from Neural_PDE.Utils.processing_utils import * 
+from Neural_PDE.Utils.training_utils import * 
 
 # %% 
 #Settung up locations. 
@@ -184,7 +184,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
     model.train()
     t1 = default_timer()
-    train_loss, test_loss = train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
+    train_loss, test_loss = train_one_epoch_AR(model, train_loader, test_loader, loss_func, optimizer, step, T_out)
     t2 = default_timer()
 
     train_loss = train_loss / ntrain / num_vars
@@ -197,6 +197,7 @@ for ep in range(epochs): #Training Loop - Epochwise
 
 train_time = default_timer() - start_time
 
+
 # %%
 #Saving the Model
 saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '.pth'
@@ -205,7 +206,7 @@ torch.save( model.state_dict(), saved_model)
 run.save_file(saved_model, 'output')
 # %%
 #Validation
-pred_set_encoded, mse, mae = validation(model, test_a, test_u_encoded, step, T_out)
+pred_set_encoded, mse, mae = validation_AR(model, test_a, test_u_encoded, step, T_out)
 # %%
 print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
