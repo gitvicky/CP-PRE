@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Wave',
                  "Field": 'u',
                  "Model": 'FNO',
-                 "Epochs": 10000,
+                 "Epochs": 1,
                  "Batch Size": 1,
                  "Optimizer": 'Adam',
                  "Learning Rate": 1e-2,
@@ -25,7 +25,7 @@ configuration = {"Case": 'Wave',
                  "Step": 40,
                  "Width_time": 32, 
                  "Width_vars": 0,  
-                 "Modes": 8,
+                 "Modes": 16,
                  "Variables":1, 
                  "Loss Function": 'Residual',
                  "UQ": 'None', #None, Dropout
@@ -36,10 +36,10 @@ configuration = {"Case": 'Wave',
 import os
 from simvue import Run
 run = Run(mode='online')
-run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'Tests', 'AR', 'Wave'], metadata=configuration)
+run.init(folder="/Neural_PDE", tags=['NPDE', 'FNO', 'PRE', 'ConvOps', 'AR', 'Wave', 'Physics-Informed'], metadata=configuration)
 
 #Saving the current run file and the git hash of the repo
-run.save(os.path.abspath(__file__), 'code')
+run.save_file(os.path.abspath(__file__), 'code')
 import git
 repo = git.Repo(search_parent_directories=True)
 sha = repo.head.object.hexsha
@@ -73,8 +73,9 @@ from Neural_PDE.Utils.training_utils import *
 #Settung up locations. 
 file_loc = os.getcwd()
 data_loc = os.path.dirname(os.getcwd()) + '/Data'
+trained_model_loc = os.path.dirname(os.getcwd()) + '/Weights'
 model_loc = file_loc + '/Weights'
-plot_loc = file_loc + '/Plots'
+plot_loc =  os.path.dirname(os.getcwd()) + '/Plots'
 #Setting up the seeds and devices
 torch.manual_seed(0)
 np.random.seed(0)
@@ -148,7 +149,7 @@ elif norm_strategy == 'Gaussian':
     normalizer = GaussianNormalizer
 
 
-norms = np.load(model_loc + '/FNO_Wave_charitable-sea_norms.npz')
+norms = np.load(trained_model_loc + '/FNO_Wave_cyclic-muntin_norms.npz')
 
 a_normalizer = normalizer(train_a)
 a_normalizer.a = torch.tensor(norms['in_a'])
@@ -188,7 +189,7 @@ print('preprocessing finished, time used:', t2-t1)
 
 model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
 if configuration['Config'] == 'finetune':
-    model.load_state_dict(torch.load(model_loc + '/FNO_Wave_charitable-sea.pth', map_location='cpu'))
+    model.load_state_dict(torch.load(trained_model_loc + '/FNO_Wave_cyclic-muntin.pth', map_location='cpu'))
 model.to(device)
 
 run.update_metadata({'Number of Params': int(model.count_params())})

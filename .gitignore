@@ -4,8 +4,8 @@ stencil_experiments/
 
 
 #simvue files
-simvue.ini
-simvue.toml
+*.ini
+*.toml
 
 #Saved Models
 Models/
