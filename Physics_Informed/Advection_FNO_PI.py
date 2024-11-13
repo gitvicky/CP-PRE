@@ -212,7 +212,7 @@ D_x = ConvOperator(domain='x', order=1)#, scale=beta)
 def residual_loss(field):
     field = field[:, 0, 1:-1, 1:-1].permute(0, 1, 2) #Taking care of the Boundaries. 
     res =  D_t(field) + (v*dt/dx) * D_x(field)
-    return D(field)
+    return res
 
 loss_func = residual_loss
     

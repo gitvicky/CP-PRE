@@ -5,10 +5,12 @@ stencil_experiments/
 
 #simvue files
 simvue.ini
+simvue.toml
 
 #Saved Models
 Models/
 *.pth
+*.pt
 
 #Venv
 venv/

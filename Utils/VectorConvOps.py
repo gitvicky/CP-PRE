@@ -27,11 +27,11 @@ def vectorize(a, b):
 
 
 class Divergence(ConvOperator):
-    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2, require_grad=False):
         super(Divergence, self).__init__()
         
-        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
-        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order, require_grad)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order, require_grad)
 
     def __call__(self, input_x, input_y):
 
@@ -39,11 +39,11 @@ class Divergence(ConvOperator):
         return outputs
 
 class Gradient(ConvOperator):
-    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2, requires_grad=False):
         super(Gradient, self).__init__()
         
-        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
-        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order, requires_grad)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order, requires_grad)
 
     def __call__(self, input_x, input_y=None):
         
@@ -54,11 +54,11 @@ class Gradient(ConvOperator):
         return outputs
     
 class Curl(ConvOperator):
-    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2):
+    def __init__(self, domain=('x','y'), order=1, scale=1.0, taylor_order=2, requires_grad=False):
         super(Curl, self).__init__()
         
-        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order)
-        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order)
+        self.grad_x = ConvOperator(domain[0], order, scale, taylor_order, requires_grad)
+        self.grad_y = ConvOperator(domain[1], order, scale, taylor_order, requires_grad)
 
     def __call__(self, input_x, input_y):
 
@@ -67,10 +67,10 @@ class Curl(ConvOperator):
     
 
 class Laplace(ConvOperator):
-    def __init__(self, domain=('x','y'), order=2, scale=1.0, taylor_order=2):
+    def __init__(self, domain=('x','y'), order=2, scale=1.0, taylor_order=2, requires_grad=False):
         super(Laplace, self).__init__()
 
-        self.laplace = ConvOperator(domain, order, scale, taylor_order)
+        self.laplace = ConvOperator(domain, order, scale, taylor_order, requires_grad)
 
     def __call__(self, input_x, input_y=None):
         
