@@ -9,6 +9,7 @@ from timeit import default_timer
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+max_grad_clip_norm = 10000.0   
 
 def train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out):
     model.train()
@@ -52,7 +53,7 @@ def train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step
         train_l2_full += l2_full.item()
 
         loss.backward()
-        # torch.nn.utils.clip_grad_norm(parameters=model.parameters(), max_norm=max_grad_clip_norm, norm_type=2.0)
+        torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=max_grad_clip_norm, norm_type=2.0)
         optimizer.step()
 
     train_loss = train_l2_full 
@@ -151,6 +152,105 @@ def validation_dropout(model, test_a, test_u, step, T_out, samples):
 
     return pred_mean, pred_var, MSE_error, MAE_error
 
+
+def train_one_epoch_MLE(model, train_loader, test_loader, loss_func, optimizer, step, T_out):
+    model.train()
+    # t1 = default_timer()
+    train_l2_step = 0
+    train_l2_full = 0
+    for xx, yy in train_loader:
+        optimizer.zero_grad()
+        loss = 0
+        xx = xx.to(device)
+        yy = yy.to(device)
+        y_old = xx[..., -step:]
+        batch_size = xx.shape[0]
+
+        for t in range(0, T_out, step):
+            y = yy[..., t:t + step]
+            im = model(xx)
+
+            #Recon Loss
+            loss += loss_func(im.reshape(batch_size, -1), y.reshape(batch_size, -1))
+
+            if t == 0:
+                pred = im
+            else:
+                pred = torch.cat((pred, im), -1)
+
+            xx = torch.cat((xx[..., step:], im[...,0:1]), dim=-1)
+
+
+        train_l2_step += loss.item()
+        l2_full = loss_func(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1))
+        train_l2_full += l2_full.item()
+
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=max_grad_clip_norm, norm_type=2.0)
+        optimizer.step()
+
+    train_loss = train_l2_full 
+    # train_l2_step = train_l2_step / ntrain / (T_out / step) /num_vars
+
+    # Validation Loop
+    test_loss = 0
+    with torch.no_grad():
+        for xx, yy in test_loader:
+            xx, yy = xx.to(device), yy.to(device)
+            batch_size = xx.shape[0]
+
+            for t in range(0, T_out, step):
+                y = yy[..., t:t + step]
+                out = model(xx)
+
+                if t == 0:
+                    pred = out
+                else:
+                    pred = torch.cat((pred, out), -1)
+ 
+                xx = torch.cat((xx[..., step:], out[...,0:1]), dim=-1)
+            test_loss += loss_func(pred.reshape(batch_size, -1), yy.reshape(batch_size, -1)).item()
+
+    # t2 = default_timer()
+
+    return train_loss, test_loss #remember to divide the ntrain/ntest and num_vars at the other end before logging.
+
+
+
+def validation_MLE(model, test_a, test_u, step, T_out):
+    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u), batch_size=1,
+                                            shuffle=False)
+    
+    pred_set_mean, pred_set_log_var = torch.zeros(test_u.shape), torch.zeros(test_u.shape)
+
+    index = 0
+    with torch.no_grad():
+        for xx, yy in tqdm(test_loader):
+            xx, yy = xx.to(device), yy.to(device)
+            t1 = default_timer()
+            for t in range(0, T_out, step):
+                out = model(xx)
+
+                if t == 0:
+                    pred = out
+                else:
+                    pred = torch.cat((pred, out), -1)
+
+                xx = torch.cat((xx[..., step:], out[...,0:1]), dim=-1)
+
+            t2 = default_timer()
+            pred_set_mean[index], pred_set_log_var[index] = pred[...,0:1], pred[...,1:2]
+            pred_set_var = torch.mean(torch.exp(pred_set_log_var) + pred_set_mean**2, axis=0) - pred_set_mean**2
+
+            index += 1
+            # print(t2 - t1)
+
+        # Performance Metrics
+        MSE_error = (pred_set_mean - test_u).pow(2).mean()
+        MAE_error = torch.abs(pred_set_mean - test_u).mean()
+
+    return pred_set_mean, pred_set_var, MSE_error, MAE_error
+
 # %% 
 # Training loop
 
@@ -169,12 +269,12 @@ def train_one_epoch_bayesian(model, train_loader, test_loader, loss_func, optimi
 
         for t in range(0, T_out, step):
             y = yy[..., t:t + step]
-            im, kl = model(xx)
+            im = model(xx)
 
             #ELBO
-            loss += loss_func(im.reshape(batch_size, -1), 
+            loss += loss_func(model, im.reshape(batch_size, -1), 
                               y.reshape(batch_size, -1), 
-                              kl, batch_size)
+                              batch_size)
 
             if t == 0:
                 pred = im
@@ -188,7 +288,7 @@ def train_one_epoch_bayesian(model, train_loader, test_loader, loss_func, optimi
         train_l2_full += l2_full.item()
 
         loss.backward()
-        # torch.nn.utils.clip_grad_norm(parameters=model.parameters(), max_norm=max_grad_clip_norm, norm_type=2.0)
+        torch.nn.utils.clip_grad_norm(parameters=model.parameters(), max_norm=max_grad_clip_norm, norm_type=2.0)
         optimizer.step()
 
     train_loss = train_l2_full 
@@ -202,7 +302,7 @@ def train_one_epoch_bayesian(model, train_loader, test_loader, loss_func, optimi
 
             for t in range(0, T_out, step):
                 y = yy[..., t:t + step]
-                out = model(xx, return_kl=False)
+                out = model(xx)
 
                 if t == 0:
                     pred = out
@@ -229,7 +329,7 @@ def validation_bayesian(model, test_a, test_u, step, T_out, samples):
                 xx, yy = xx.to(device), yy.to(device)
                 t1 = default_timer()
                 for t in range(0, T_out, step):
-                    out = model(xx, return_kl=False)
+                    out = model(xx)
 
                     if t == 0:
                         pred = out
