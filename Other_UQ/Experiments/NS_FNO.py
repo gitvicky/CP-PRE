@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Navier-Stokes',
                  "Field": 'u, v, p',
                  "Model": 'FNO',
-                 "Epochs": 250,
+                 "Epochs": 500,
                  "Batch Size": 5,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -29,7 +29,7 @@ configuration = {"Case": 'Navier-Stokes',
                  "Variables":3, 
                  "Loss Function": 'LP',
                  "Seed": 0, 
-                 "UQ": 'Ensemble', #Deterministic, Dropout, Bayesian, MLE, Ensemble
+                 "UQ": 'SWAG', #Deterministic, Dropout, Bayesian, MLE, Ensemble, SWAG
                  }
 
 # %%
@@ -194,6 +194,11 @@ with Run(mode='online') as run:
     elif configuration['UQ']=='Ensemble':
         from Models.Base_FNO import *
         model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
+    elif configuration['UQ']=='SWAG':
+        from Models.Base_FNO import *
+        from Utils.SWAG import *
+        model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
+        swag_model = SWAG(model)
 
     model.to(device)
     run.update_metadata({'Number of Params': int(model.count_params())})
@@ -202,6 +207,9 @@ with Run(mode='online') as run:
     #Setting up the optimizer and scheduler, loss and epochs 
     optimizer = torch.optim.Adam(model.parameters(), lr=configuration['Learning Rate'], weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=configuration['Scheduler Gamma'])
+    if configuration['UQ'] == 'SWAG':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=configuration['Scheduler Step'], gamma=1.0)
+
     epochs = configuration['Epochs']
 
     loss_func = LpLoss(size_average=False)
@@ -227,6 +235,10 @@ with Run(mode='online') as run:
         train_epoch = train_one_epoch_MLE
     elif configuration['UQ']=='Ensemble':
         train_epoch = train_one_epoch
+    elif configuration['UQ'] == 'SWAG':
+        train_epoch = train_one_epoch
+        swag_start = int(0.8*epochs)
+        swag_freq = 10
 
     start_time = default_timer()
     for ep in range(epochs): #Training Loop - Epochwise
@@ -241,7 +253,12 @@ with Run(mode='online') as run:
 
         print(f"Epoch {ep}, Time Taken: {round(t2-t1,3)}, Train Loss: {round(train_loss, 3)}, Test Loss: {round(test_loss,3)}")
         run.log_metrics({'Train Loss': train_loss, 'Test Loss': test_loss})
-        
+
+        # Collect models for SWAG
+        if configuration['UQ'] == 'SWAG':
+            if ep >= swag_start and (ep - swag_start) % swag_freq == 0:
+                swag_model.collect_model(model)
+            
         scheduler.step()
 
     train_time = default_timer() - start_time
@@ -252,6 +269,12 @@ with Run(mode='online') as run:
 
     torch.save( model.state_dict(), saved_model)
     run.save_file(saved_model, 'output')
+
+    if configuration['UQ'] == 'SWAG':
+        saved_model = model_loc + '/' + configuration['Model'] + '_' + configuration['Case'] + '_' +run.name + '_swag.pt'
+        swag_model.save(saved_model)
+        run.save_file(saved_model, 'output')
+
     # %%
     #Validation
     if configuration['UQ']=='Deterministic':
@@ -268,6 +291,9 @@ with Run(mode='online') as run:
 
     if configuration['UQ']=='Ensemble':
         pred_set_encoded, mse, mae = validation(model, test_a, test_u_encoded, step, T_out)
+
+    if configuration['UQ'] == 'SWAG':
+        pred_set_encoded, pred_set_encoded_var, mse, mae = validation_SWAG(model, swag_model, test_a, test_u_encoded, step, T_out, samples=20)
 
     # %%
     print('Testing Error (MSE) : %.3e' % (mse))
