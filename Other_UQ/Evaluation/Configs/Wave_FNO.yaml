@@ -1,4 +1,5 @@
-UQ: 'Bayesian'
+UQ: 'PRE'
+Dist : 'in' #in or out
 Case: 'Wave'
 Field: 'u'
 Model: 'FNO'
@@ -25,4 +26,6 @@ Runs:
   Dropout: 'worn-transfer'
   Ensemble: ['rude-cactus', 'heartless-eggs', 'greasy-bibliography', 'pureed-gator', 'piquant-hoop']
   Bayesian: 'hidden-program'
-  SWAG: ''
+  SWAG: 'espressivo-horror'
+  AER: 'convex-cottage'
+  PRE: 'convex-cottage'

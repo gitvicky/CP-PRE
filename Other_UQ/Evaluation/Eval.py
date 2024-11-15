@@ -41,6 +41,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.getcwd())))
 from Neural_PDE.Utils.processing_utils import * 
 from Utils.training_utils import * 
 from Utils.loss_utils import * 
+from Neural_PDE.UQ.inductive_cp import * 
+from Utils.ConvOps_2d import *
+from PRE_estimations import * 
+
 # %% 
 #Setting up locations. 
 file_loc = os.getcwd()
@@ -61,9 +65,11 @@ from data_loaders import *
 
 pde = configuration['Case']
 if pde == 'Wave':
-    x, y, t, vars = Wave()
+    x, y, t, vars = Wave(configuration['Dist'])
+    dx, dt = x[1]-x[0], t[1]-t[0]
     ntrain = 500
-    ntest = 50
+    ntest = 500
+    pre = PRE_Wave(dt, dx)
 if pde == 'Navier-Stokes':
     x, y, dt, vars = Navier_Stokes()
     ntrain = 200
@@ -148,6 +154,17 @@ elif configuration['UQ'] == 'Bayesian':
 elif configuration['UQ']=='MLE':
     from Models.Base_FNO import *
     model = FNO_multi2d(T_in, step*2, modes, modes, num_vars, width_time)
+elif configuration['UQ']=='AER':
+    from Models.Base_FNO import *
+    model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
+elif configuration['UQ']=='PRE':
+    from Models.Base_FNO import *
+    model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
+
+try:
+    model.load_state_dict(torch.load(model_loc + '/FNO_' + configuration['Case'] + '_' + run_name + '.pth', map_location='cpu'))
+except:
+    pass
 
 if configuration['UQ']=='Ensemble':
     from Models.Base_FNO import *
@@ -157,9 +174,6 @@ if configuration['UQ']=='Ensemble':
         model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
         model.load_state_dict(torch.load(model_loc + '/FNO_' + configuration['Case'] + '_' + run_name + '.pth', map_location='cpu'))
         models.append(model)
-
-
-model.load_state_dict(torch.load(model_loc + '/FNO_' + configuration['Case'] + '_' + run_name + '.pth', map_location='cpu'))
 
 
 if configuration['UQ'] == 'SWAG':
@@ -197,20 +211,45 @@ if configuration['UQ']=='Ensemble':
 if configuration['UQ'] == 'SWAG':
         pred_set_encoded, pred_set_encoded_std, mse, mae = validation_SWAG(model, swag_model, test_a, test_u_encoded, step, T_out, samples=5)
 
+if configuration['UQ']=='AER':
+    alpha = 0.05
+    pred_set_encoded, qhat,  mse, mae = validation_AER(model, test_a, test_u_encoded, step, T_out, alpha)
+
+if configuration['UQ']=='PRE':
+    alpha=0.05
+    pred_set_encoded, qhat, mse, mae = validation_PRE(model, test_a, test_u_encoded, step, T_out, alpha, pre)
+
 t2 = default_timer()
 
 print('Testing Error (MSE) : %.3e' % (mse))
 print('Testing Error (MAE) : %.3e' % (mae))
 print(f'Evaluation Time (s) : {t2-t1}')
 
-from Neural_PDE.UQ.inductive_cp import * 
-if configuration['UQ'] != 'Deterministic':
+try:
+    pred_set_encoded_std
     pred_sets = [pred_set_encoded.numpy() - 2*pred_set_encoded_std.numpy(), pred_set_encoded.numpy() + 2*pred_set_encoded_std.numpy()]
     marginal_cov = emp_cov(pred_sets, test_u_encoded.numpy())
     joint_cov = emp_cov_joint(pred_sets, test_u_encoded.numpy())
 
     print(f'Marginal Coverage (%) : {marginal_cov}')
     print(f'Joint Coverage (%) : {joint_cov}')
+except: 
+    pass
+
+if configuration['UQ'] == 'AER' :
+    pred_sets = [pred_set_encoded.numpy() - qhat, pred_set_encoded.numpy() + qhat]
+    marginal_cov = emp_cov(pred_sets, test_u_encoded.numpy())
+    joint_cov = emp_cov_joint(pred_sets, test_u_encoded.numpy())
+
+    print(f'Marginal Coverage (%) : {marginal_cov}')
+    print(f'Joint Coverage (%) : {joint_cov}')
+
+if configuration['UQ'] == 'PRE':
+    pred_sets = [-qhat, qhat]
+    marginal_cov = emp_cov(pred_sets, pre.residual(pred_set_encoded.permute(0, 1, 4, 2, 3)).numpy())
+    # joint_cov = emp_cov_joint(pred_sets, test_u_encoded.numpy())
+    print(f'Marginal Coverage (%) : {marginal_cov}')
+    # print(f'Joint Coverage (%) : {joint_cov}')
 
 #Denormalising the predictions
 pred_set = u_normalizer.decode(pred_set_encoded.to(device)).cpu()

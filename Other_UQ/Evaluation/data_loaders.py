@@ -12,8 +12,11 @@ def stacked_fields(variables):
     stack = torch.stack(stack, dim=1)
     return stack
 
-def Wave():
-    data =  np.load(data_loc + '/Spectral_Wave_data_LHS.npz')
+def Wave(dist):
+    if dist == 'in':
+        data =  np.load(data_loc + '/Spectral_Wave_data_LHS.npz')
+    else:
+        data = np.load(data_loc + '/Spectral_Wave_data_LHS_OOD_halfspeed.npz')
 
     u_sol = data['u'].astype(np.float32)
     x = data['x'].astype(np.float32)

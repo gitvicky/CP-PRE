@@ -114,7 +114,7 @@ class SWAG:
     @classmethod
     def load(cls, path, base_model):
         """Load SWAG model state"""
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, map_location=device)
         
         swag = cls(base_model, 
                   max_num_models=checkpoint['max_num_models'],
@@ -128,6 +128,6 @@ class SWAG:
         swag.device = checkpoint['device']
         
         # Move model to the saved device
-        swag.to(swag.device)
+        swag.to(device)
         
         return swag

@@ -437,3 +437,75 @@ def validation_SWAG(model, swag_model, test_a, test_u, step, T_out, samples):
 
     return pred_mean, pred_var, MSE_error, MAE_error
 
+# %% 
+#Inductive CP using AER 
+from Neural_PDE.UQ.inductive_cp import * 
+
+def validation_AER(model, test_a, test_u, step, T_out, alpha):
+    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u), batch_size=1,
+                                            shuffle=False)
+    pred_set = torch.zeros(test_u.shape)
+    index = 0
+    with torch.no_grad():
+        for xx, yy in tqdm(test_loader):
+            xx, yy = xx.to(device), yy.to(device)
+            t1 = default_timer()
+            for t in range(0, T_out, step):
+                out = model(xx)
+
+                if t == 0:
+                    pred = out
+                else:
+                    pred = torch.cat((pred, out), -1)
+
+                xx = torch.cat((xx[..., step:], out), dim=-1)
+
+            t2 = default_timer()
+            pred_set[index] = pred
+            index += 1
+            # print(t2 - t1)
+
+        # Performance Metrics
+        MSE_error = (pred_set - test_u).pow(2).mean()
+        MAE_error = torch.abs(pred_set - test_u).mean()
+
+    ncf_scores = torch.abs(pred_set - test_u).numpy()
+    qhat = calibrate(ncf_scores, len(pred_set), alpha)
+    return pred_set, qhat, MSE_error, MAE_error
+
+
+# %% 
+#Inductive CP with PRE
+from Utils.ConvOps_2d import * 
+def validation_PRE(model, test_a, test_u, step, T_out, alpha, pre):
+    test_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(test_a, test_u), batch_size=1,
+                                            shuffle=False)
+    pred_set = torch.zeros(test_u.shape)
+    index = 0
+    with torch.no_grad():
+        for xx, yy in tqdm(test_loader):
+            xx, yy = xx.to(device), yy.to(device)
+            t1 = default_timer()
+            for t in range(0, T_out, step):
+                out = model(xx)
+
+                if t == 0:
+                    pred = out
+                else:
+                    pred = torch.cat((pred, out), -1)
+
+                xx = torch.cat((xx[..., step:], out), dim=-1)
+
+            t2 = default_timer()
+            pred_set[index] = pred
+            index += 1
+            # print(t2 - t1)
+
+        # Performance Metrics
+        MSE_error = (pred_set - test_u).pow(2).mean()
+        MAE_error = torch.abs(pred_set - test_u).mean()
+
+    
+    ncf_scores = torch.abs(pre.residual(pred_set.permute(0, 1, 4, 2, 3))).numpy()
+    qhat = calibrate(ncf_scores, len(pred_set), alpha)
+    return pred_set, qhat, MSE_error, MAE_error
