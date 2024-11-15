@@ -1,7 +1,7 @@
 # %%
 import torch 
 import torch.nn.functional as F 
-# from Utils.BayesianLoss import * 
+from Utils.BayesianLoss import * 
 
 def NLL(pred, target):
     """
@@ -19,27 +19,19 @@ def NLL(pred, target):
     loss = (pred_log_var + (pred_mean-target).pow(2) / torch.exp(pred_log_var)) / 2
     return loss.mean()
 
-# def ELBO(pred, target, kl_div, num_batches, beta=1.0):
-#     """
-#     Evidence Lower BOund (ELBO) loss function
-#     Args:
-#         pred: model prediction
-#         target: ground truth
-#         kl_div: KL divergence term
-#         num_batches: number of batches in dataset (for KL scaling)
-#         beta: weight for KL term
-#     """
-#     likelihood = -0.5 * F.mse_loss(pred, target, reduction='sum')
-#     kl_term = beta * kl_div / num_batches
-#     return -(likelihood - kl_term)
-
-
-# def ELBO(model, pred, target, batch_size, kl_weight = 0.1):
-#     mse_loss = torch.nn.MSELoss(pred, target)
-#     kl_loss = BKLLoss(reduction='mean', last_layer_only=False)(model)
-#     return (mse_loss + kl_weight*kl_loss)/batch_size
-
-
-
+def ELBO(model, pred, target, batch_size):
+    """
+    Calculate ELBO loss for Bayesian Neural Network
+    
+    ELBO = E_q[log p(D|w)] - KL(q(w)||p(w))
+    where:
+    - q(w) is variational posterior
+    - p(w) is prior distribution
+    - p(D|w) is likelihood
+    """
+    likelihood = -F.mse_loss(pred, target, reduction='sum')
+    kl_div = BKLLoss(reduction='mean', last_layer_only=True)(model)
+    elbo = -(likelihood - kl_div) / batch_size
+    return elbo
 
 # %%

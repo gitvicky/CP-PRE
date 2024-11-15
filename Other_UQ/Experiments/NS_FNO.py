@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'Navier-Stokes',
                  "Field": 'u, v, p',
                  "Model": 'FNO',
-                 "Epochs": 500,
+                 "Epochs": 250,
                  "Batch Size": 5,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -29,7 +29,7 @@ configuration = {"Case": 'Navier-Stokes',
                  "Variables":3, 
                  "Loss Function": 'LP',
                  "Seed": 0, 
-                 "UQ": 'Deterministic', #Deterministic, Dropout, Bayesian, MLE, Ensemble
+                 "UQ": 'Ensemble', #Deterministic, Dropout, Bayesian, MLE, Ensemble
                  }
 
 # %%
@@ -349,7 +349,7 @@ with Run(mode='online') as run:
         fig.colorbar(pcm, pad=0.05)
 
 
-        plot_name = plot_loc + '/' + configuration['Field'] + '_' + run.name + '.png'
+        plot_name = plot_loc + '/' + field[var] + '_' + run.name + '.png'
         plt.savefig(plot_name)
         run.save_file(plot_name, 'output')
 
@@ -394,7 +394,7 @@ with Run(mode='online') as run:
             fig.colorbar(pcm, pad=0.05)
 
 
-            plot_name = plot_loc + '/' + configuration['Field'] + '_var_' + run.name + '.png'
+            plot_name = plot_loc + '/' + field[var] + '_var_' + run.name + '.png'
             plt.savefig(plot_name)
             run.save_file(plot_name, 'output')
         except:

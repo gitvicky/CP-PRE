@@ -1,7 +1,0 @@
-matplotlib==3.7.1
-numpy==1.26.4
-pyDOE==0.3.8
-torch==2.0.1
-tqdm==4.65.0
-gitpython==3.1.43
-scipy==1.13.0
