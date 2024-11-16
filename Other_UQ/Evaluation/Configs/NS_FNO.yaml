@@ -1,3 +1,5 @@
+UQ: 'PRE'
+Dist : 'in' #in or out
 Case: 'Navier-Stokes'
 Field: 'u v p'
 Model: 'FNO'
@@ -19,4 +21,11 @@ Modes: 8
 Variables: 3 
 Loss Function: 'LP'
 Seed: 0 
-UQ: 'Deterministic' #Deterministic Dropout Bayesian MLE Ensemble
+Runs: 
+  Deterministic: 'convex-cottage'
+  Dropout: 'worn-transfer'
+  Ensemble: ['rude-cactus', 'heartless-eggs', 'greasy-bibliography', 'pureed-gator', 'piquant-hoop']
+  Bayesian: 'hidden-program'
+  SWAG: 'espressivo-horror'
+  AER: 'convex-cottage'
+  PRE: 'convex-cottage'

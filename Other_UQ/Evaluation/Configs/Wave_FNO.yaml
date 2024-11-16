@@ -1,4 +1,4 @@
-UQ: 'PRE'
+UQ: 'Dropout'
 Dist : 'in' #in or out
 Case: 'Wave'
 Field: 'u'
