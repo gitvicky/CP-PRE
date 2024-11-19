@@ -1,7 +1,7 @@
 UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
 Dist : 'out' #in or out
-Case: 'Navier-Stokes'
-Field: 'u v p'
+Case: 'MHD'
+Field: 'rho, u, v, p, Bx, By'
 Model: 'FNO'
 Epochs: 500
 Batch Size: 5
@@ -18,14 +18,14 @@ Step: 1
 Width_time: 16 
 Width_vars: 0  
 Modes: 8
-Variables: 3 
+Variables: 6 
 Loss Function: 'LP'
 Seed: 0 
 Runs: 
-  Deterministic: 'wan-sensor'
-  Dropout: 'dense-map'
-  Ensemble: ['chill-bourbon', 'unary-player', 'magenta-flour', 'smart-flute', 'proper-rebase']
-  Bayesian: 'gold-gear'
-  SWAG: 'nondeterministic-message'
-  AER: 'wan-sensor'
-  PRE: 'wan-sensor'
+  Deterministic: 'free-puck'
+  Dropout: 'gritty-salamander'
+  Ensemble: ['obtuse-fossil', 'adagio-watch', 'concrete-style', 'future-grenade', 'green-depth']
+  Bayesian: 'shortest-agate'
+  SWAG: 'crunchy-landing'
+  AER: 'free-puck'
+  PRE: 'free-puck'

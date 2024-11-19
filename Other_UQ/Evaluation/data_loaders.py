@@ -26,26 +26,40 @@ def Wave(dist):
     u = u.permute(0, 2, 3, 1)
     u = torch.unsqueeze(u, 1)
 
+    if dist=='in':
+        ntrain = 500
+        u = u[ntrain:]
+
     return x, y, t, u
 
-def Navier_Stokes():
-    data =  np.load(data_loc + '/NS_Spectral_combined.npz')
+def Navier_Stokes(dist):
+    if dist == 'in':
+        data =  np.load(data_loc + '/NS_Spectral_combined.npz')
+    else: 
+        data =  np.load(data_loc + '/NS_Spectral_combined_nu_1e-2_OOD.npz')
+        # data = np.load(data_loc + '/NS_Spectral_IC_OOD.npz')
 
-    u = data['u'].astype(np.float32)
-    v = data['v'].astype(np.float32)
-    p = data['p'].astype(np.float32)
-    x = data['x']
-    y = x
-    dt = data['dt']
+    u = data['u'].astype(np.float32)[:, ::2]
+    v = data['v'].astype(np.float32)[:, ::2]
+    p = data['p'].astype(np.float32)[:, ::2]
+    # w = data['w'].astype(np.float32)[:, ::2]
+    x = data['x'].astype(np.float32)
+    y = data['x'].astype(np.float32)
+    dt = data['dt'].astype(np.float32) * 2 
     
-    dt = torch.tensor(dt, dtype=torch.float)
-
     vars = stacked_fields([u,v,p])
+
+    if dist=='in':
+        ntrain = 200
+        u = u[ntrain:]
 
     return x, y, dt, vars
 
-def MHD():
-    data =  np.load(data_loc + '/Constrained_MHD_combined.npz')
+def MHD(dist):
+    if dist == 'in':
+        data =  np.load(data_loc + '/Constrained_MHD_combined.npz')
+    else: 
+        data =  np.load(data_loc + '/Constrained_MHD_combined_OOD.npz')
 
     rho = data['rho'].astype(np.float32)[:, ::2]
     u = data['u'].astype(np.float32)[:, ::2]
@@ -69,6 +83,12 @@ def MHD():
 
     x_slice = 1 
     vars = stacked_fields([rho, u, v, p, Bx, By])[:, :, ::x_slice, ::x_slice, :]
+
+
+    if dist=='in':
+        ntrain = 200
+        u = u[ntrain:]
+
     return x, y, dt, vars
 
 
