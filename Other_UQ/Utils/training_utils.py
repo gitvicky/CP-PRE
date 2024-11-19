@@ -89,7 +89,7 @@ def validation(model, test_a, test_u, step, T_out):
     pred_set = torch.zeros(test_u.shape)
     index = 0
     with torch.no_grad():
-        for xx, yy in tqdm(test_loader):
+        for xx, yy in tqdm(test_loader, disable=False):
             xx, yy = xx.to(device), yy.to(device)
             t1 = default_timer()
             for t in range(0, T_out, step):
@@ -123,7 +123,7 @@ def validation_dropout(model, test_a, test_u, step, T_out, samples):
         for ii in range(samples): 
             index = 0
             pred_set = torch.zeros(test_u.shape)
-            for xx, yy in tqdm(test_loader):
+            for xx, yy in tqdm(test_loader, disable=True):
                 xx, yy = xx.to(device), yy.to(device)
                 t1 = default_timer()
                 for t in range(0, T_out, step):
@@ -161,9 +161,10 @@ def validation_ensemble(models, test_a, test_u, step, T_out):
     with torch.no_grad():
         for ii in range(len(models)): 
             model = models[ii]
+            model = model.to(device)
             index = 0
             pred_set = torch.zeros(test_u.shape)
-            for xx, yy in tqdm(test_loader):
+            for xx, yy in tqdm(test_loader, disable=True):
                 xx, yy = xx.to(device), yy.to(device)
                 t1 = default_timer()
                 for t in range(0, T_out, step):
@@ -265,7 +266,7 @@ def validation_MLE(model, test_a, test_u, step, T_out):
 
     index = 0
     with torch.no_grad():
-        for xx, yy in tqdm(test_loader):
+        for xx, yy in tqdm(test_loader, disable=True):
             xx, yy = xx.to(device), yy.to(device)
             t1 = default_timer()
             for t in range(0, T_out, step):
@@ -365,7 +366,7 @@ def validation_bayesian(model, test_a, test_u, step, T_out, samples):
         for ii in range(samples): 
             index = 0
             pred_set = torch.zeros(test_u.shape)
-            for xx, yy in tqdm(test_loader):
+            for xx, yy in tqdm(test_loader, disable=True):
                 xx, yy = xx.to(device), yy.to(device)
                 t1 = default_timer()
                 for t in range(0, T_out, step):
@@ -407,7 +408,7 @@ def validation_SWAG(model, swag_model, test_a, test_u, step, T_out, samples):
             swag_model.sample()
             index = 0
             pred_set = torch.zeros(test_u.shape)
-            for xx, yy in tqdm(test_loader):
+            for xx, yy in tqdm(test_loader, disable=True):
                 xx, yy = xx.to(device), yy.to(device)
                 t1 = default_timer()
                 for t in range(0, T_out, step):
@@ -447,7 +448,7 @@ def validation_AER(model, test_a, test_u, step, T_out, alpha):
     pred_set = torch.zeros(test_u.shape)
     index = 0
     with torch.no_grad():
-        for xx, yy in tqdm(test_loader):
+        for xx, yy in tqdm(test_loader, disable=True):
             xx, yy = xx.to(device), yy.to(device)
             t1 = default_timer()
             for t in range(0, T_out, step):
@@ -483,7 +484,7 @@ def validation_PRE(model, test_a, test_u, step, T_out, alpha, pre):
     pred_set = torch.zeros(test_u.shape)
     index = 0
     with torch.no_grad():
-        for xx, yy in tqdm(test_loader):
+        for xx, yy in tqdm(test_loader, disable=True):
             xx, yy = xx.to(device), yy.to(device)
             t1 = default_timer()
             for t in range(0, T_out, step):

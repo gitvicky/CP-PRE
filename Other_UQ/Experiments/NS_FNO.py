@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FNO modelled over the 2D Wave Equation auto-regressively 
-
-Equation: u_tt = D*(u_xx + u_yy), D=1.0
+Navier-Stokes
 
 """
 

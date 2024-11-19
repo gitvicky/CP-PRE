@@ -1,0 +1,31 @@
+UQ: 'PRE'
+Dist : 'in' #in or out
+Case: 'MHD'
+Field: 'rho Phi T'
+Model: 'FNO'
+Epochs: 500
+Batch Size: 5
+Optimizer: 'Adam'
+Learning Rate: 0.005
+Scheduler Step: 100
+Scheduler Gamma: 0.5
+Activation: 'GeLU'
+Physics Normalisation: 'No'
+Normalisation Strategy: 'Min-Max'
+T_in: 1    
+T_out: 20
+Step: 1
+Width_time: 16 
+Width_vars: 0  
+Modes: 8
+Variables: 6 
+Loss Function: 'LP'
+Seed: 0 
+Runs: 
+  Deterministic: 'free-puck'
+  Dropout: 'gritty-salamander'
+  Ensemble: ['obtuse-fossil', 'adagio-watch', 'concrete-style', 'future-grendae', 'green-depth']
+  Bayesian: 'shortest-agate'
+  SWAG: 'crunchy-landing'
+  AER: 'free-puck'
+  PRE: 'free-puck'
