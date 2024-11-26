@@ -1,6 +1,6 @@
 # Calibrated Physics-Informed Uncertainty Quantification
 
-A framework for providing calibrated, physics-informed uncertainty estimates for neural PDE solvers using conformal prediction. This approach leverages physics residual errors as a nonconformity score within a conformal prediction framework to enable data-free, model-agnostic, and statistically guaranteed uncertainty estimates.
+A framework for providing calibrated, physics-informed uncertainty estimates for neural PDE solvers using conformal prediction. This approach leverages physics residual errors as a nonconformity score within a conformal prediction framework to enable data-free, model-agnostic, and statistically guaranteed uncertainty estimates. 
 
 ## Key Features
 
@@ -21,34 +21,26 @@ A framework for providing calibrated, physics-informed uncertainty estimates for
 ├── Physics_Informed/      # Physics-informed components
 ├── Tests/                 # Test suite
 ├── Utils/                 # Utility functions
-└── __pycache__/           # Python cache files
+└── Other_UQ/              # Bayesian Deep Learning Experiments
 ```
 
 ## Experiments
 
-The repository includes implementations for the following PDEs:
+The repository includes experiments over the following PDEs:
 
 1. 1D Advection Equation
-   - Domain: x ∈ [0, 2], t ∈ [0, 0.5]
-   - Crank-Nicholson Solver
-
-2. 1D Burgers' Equation
-   - Domain: x ∈ [0, 2], t ∈ [0, 1.25]
-   - Finite Difference Solver
-     
+2. 1D Burgers' Equation   
 3. 2D Wave Equation
-   - Domain: x, y ∈ [−1, 1], t ∈ [0, 1.0]
-   - Spectral Solver
-
 4. 2D Navier-Stokes Equations
-   - Domain: x, y ∈ [0, 1], t ∈ [0, 0.5]
-   - Spectral Solver
-   - Incompressible fluid flow
-
 5. 2D Magnetohydrodynamics (MHD)
-   - Domain: x, y ∈ [0, 1]², t ∈ [0, 5]
-   - Finite-Volume Solver
-   - Ideal MHD equations
+
+## Benchmarking 
+The methdology is benchmarked against several Bayesian Deep Learning Methods: 
+
+1. MC Dropout
+2. Deep Ensembles 
+3. Bayesian Neural Networks
+4. Stochastic Weighted Avergaing - Gaussian
 
 ## Requirements
 
@@ -123,7 +115,7 @@ If you use this code in your research, please cite:
 
 ## License
 
-[Add License Information]
+MIT License
 
 ## Contributors
 
