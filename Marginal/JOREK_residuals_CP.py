@@ -247,7 +247,6 @@ def residual_temperature(vars, boundary=False, norms=False):
 cal_out_residual = residual_temperature(u_out_cal)
 cal_pred_residual = residual_temperature(pred_cal)
 
-
 ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 
 # %% 
@@ -315,3 +314,138 @@ plt.ylabel('Empirical Coverage')
 plt.legend()
 
 # %% 
+#Paper Plots 
+
+import matplotlib as mpl 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib import cm
+import matplotlib.ticker as ticker
+
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [-qhat, + qhat]
+
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 20
+t_idx= 35
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(pred_pred_residual[idx, t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'PRE: $D_{}(\rho,\phi,T)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_residual_temp.svg", format="svg",transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_residual_temp.pdf", format="pdf",transparent=True, bbox_inches='tight')
+plt.show()
+
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(prediction_sets[1][t_idx], cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_jorek_temp_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_jorek_temp_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
+
+plt.show()
+# %%
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(torch.abs(u_out_pred[idx,2,..., t_idx]-pred_pred[idx,2,..., t_idx]), cmap='magma')
+
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'Absolute Error: $(T)$', fontsize=36)
+
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_abs_err_temp.svg", format="svg",transparent=True, bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_abs_err_temp.pdf", format="pdf",transparent=True, bbox_inches='tight')
+plt.show()
+
+# %%

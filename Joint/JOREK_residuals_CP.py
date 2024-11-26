@@ -239,12 +239,12 @@ def residual_temperature(vars, boundary=False, norms=False):
         return res[...,1:-1,1:-1,1:-1]
 
 #Continuity
-cal_out_residual = residual_continuity(u_out_cal)
-cal_pred_residual = residual_continuity(pred_cal)
+# cal_out_residual = residual_continuity(u_out_cal)
+# cal_pred_residual = residual_continuity(pred_cal)
 
-# #Temperature
-# cal_out_residual = residual_temperature(u_out_cal)
-# cal_pred_residual = residual_temperature(pred_cal)
+#Temperature
+cal_out_residual = residual_temperature(u_out_cal)
+cal_pred_residual = residual_temperature(pred_cal)
 
 modulation = modulation_func(cal_out_residual.numpy(), cal_pred_residual.numpy())
 ncf_scores = ncf_metric_joint(cal_out_residual.numpy(), cal_pred_residual.numpy(), modulation)
@@ -269,12 +269,12 @@ print('Prediction (MAE) Error: %.3e' % (mae))
 pred_pred = out_normalizer.decode(pred_encoded_pred.to(device)).cpu()
 
 #Continuity
-pred_out_residual = residual_continuity(u_out_pred)
-pred_pred_residual = residual_continuity(pred_pred)
+# pred_out_residual = residual_continuity(u_out_pred)
+# pred_pred_residual = residual_continuity(pred_pred)
 
 # #Temperature
-# pred_out_residual = residual_temperature(u_out_pred)
-# pred_pred_residual = residual_temperature(pred_pred)
+pred_out_residual = residual_temperature(u_out_pred)
+pred_pred_residual = residual_temperature(pred_pred)
 
 
 #Emprical Coverage for all values of alpha 

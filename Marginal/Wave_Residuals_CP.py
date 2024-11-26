@@ -455,3 +455,82 @@ plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.pdf", form
 plt.show()
 
 # %%
+#Further Rebuttal Plots - Exploring discretisation. - Larger Temporal Discretisations. 
+
+disc = 1
+targs = pred_out[..., ::disc]
+preds = pred_pred[..., ::disc]
+dtt = dt*disc
+
+
+D = ConvOperator()
+c = torch.tensor(c, dtype=torch.float32)
+D.kernel = D_tt.kernel - (c*dtt/dx)**2 * D_xx_yy.kernel 
+residual = D
+
+# Residual
+def residual_momentum(uu, boundary=False):
+    res = D(uu)
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1,1:-1]
+targs_residual = residual_momentum(targs.permute(0,1,4,2,3)[:,0]) #Targets
+preds_residual = residual_momentum(preds.permute(0,1,4,2,3)[:,0]) #Prediction
+
+
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 20
+t_idx= 2
+
+# Create figure and axis
+fig, ax = plt.subplots()
+
+# Plot the image
+im = ax.imshow(targs_residual[idx, t_idx], cmap='magma')
+    
+# Create an axes on the right side of ax. The width of cax will be 5%
+# of ax and the padding between cax and ax will be fixed at 0.05 inch.
+divider = make_axes_locatable(ax)
+cax = divider.append_axes("right", size="5%", pad=0.15)
+
+# Create colorbar in the appended axes
+cbar = plt.colorbar(im, cax=cax)
+# Set colorbar ticks to use scientific notation
+cbar.formatter = ticker.ScalarFormatter(useMathText=True)
+cbar.formatter.set_scientific(True)
+cbar.formatter.set_powerlimits((0, 0))
+cbar.update_ticks()
+cbar.ax.tick_params(labelsize=36)
+
+# Remove ticks
+ax.set_xticks([])
+ax.set_yticks([])
+
+# Set labels and title
+ax.set_xlabel(r'$x$', fontsize=36)
+ax.set_ylabel(r'$y$', fontsize=36)
+ax.set_title(r'PRE: $D(u)$', fontsize=36)
+
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/ns_residual_mom.svg", format="svg",transparent=True, bbox_inches='tight')
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/wave_disc_targ_res1.pdf", format="pdf",transparent=True, bbox_inches='tight')
+# plt.show()
+
+# %%
