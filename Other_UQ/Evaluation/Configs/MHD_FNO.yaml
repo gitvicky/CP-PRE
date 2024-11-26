@@ -1,5 +1,6 @@
-UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
-Dist : 'out' #in or out
+# UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
+UQ: ['Bayesian', 'SWAG', 'AER', 'PRE']
+Dist : 'in' #in or out
 Case: 'MHD'
 Field: 'rho, u, v, p, Bx, By'
 Model: 'FNO'
@@ -24,8 +25,9 @@ Seed: 0
 Runs: 
   Deterministic: 'free-puck'
   Dropout: 'gritty-salamander'
-  Ensemble: ['obtuse-fossil', 'adagio-watch', 'concrete-style', 'future-grenade', 'green-depth']
-  Bayesian: 'shortest-agate'
-  SWAG: 'crunchy-landing'
+  # Ensemble: ['obtuse-fossil', 'adagio-watch', 'concrete-style', 'future-grenade', 'green-depth'] #250
+  Ensemble: ['molten-acid', 'lazy-estuary', 'slow-strait', 'adaptive-request', 'worn-batch']#
+  Bayesian: 'gravitational-resistivity'
+  SWAG: 'edible-index'
   AER: 'free-puck'
   PRE: 'free-puck'

@@ -1,4 +1,4 @@
-UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
+UQ: ['AER', 'PRE']
 Dist : 'out' #in or out
 Case: 'Wave'
 Field: 'u'

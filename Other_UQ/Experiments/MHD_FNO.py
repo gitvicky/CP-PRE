@@ -11,7 +11,7 @@ Equation: u_tt = D*(u_xx + u_yy), D=1.0
 configuration = {"Case": 'MHD',
                  "Field": 'rho, u, v, p, Bx, By',
                  "Model": 'FNO',
-                 "Epochs": 250,
+                 "Epochs": 500,
                  "Batch Size": 5,
                  "Optimizer": 'Adam',
                  "Learning Rate": 0.005,
@@ -29,7 +29,7 @@ configuration = {"Case": 'MHD',
                  "Variables":6, 
                  "Loss Function": 'LP',
                  "Seed": 0, 
-                 "UQ": 'SWAG', #Deterministic, Dropout, Bayesian, Ensemble, SWAG
+                 "UQ": 'Bayesian', #Deterministic, Dropout, Bayesian, Ensemble, SWAG
                  }
 
 # %%

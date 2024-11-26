@@ -27,7 +27,7 @@ configuration = {"Case": 'Navier-Stokes',
                  "Variables":3, 
                  "Loss Function": 'LP',
                  "Seed": 0, 
-                 "UQ": 'SWAG', #Deterministic, Dropout, Bayesian, MLE, Ensemble, SWAG
+                 "UQ": 'Bayesian', #Deterministic, Dropout, Bayesian, MLE, Ensemble, SWAG
                  }
 
 # %%

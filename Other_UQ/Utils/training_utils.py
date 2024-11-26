@@ -9,7 +9,7 @@ from timeit import default_timer
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-max_grad_clip_norm = 10000.0   
+max_grad_clip_norm = 2.0   
 
 def train_one_epoch(model, train_loader, test_loader, loss_func, optimizer, step, T_out):
     model.train()

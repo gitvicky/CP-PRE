@@ -12,7 +12,7 @@ Evaluating other UQ methods
 # %%
 import yaml
 config_loc = '/home/ir-gopa2/rds/rds-ukaea-ap001/ir-gopa2/Code/Residuals_UQ/Other_UQ/Evaluation/Configs/'
-config = config_loc + 'NS_FNO.yaml'
+config = config_loc + 'MHD_FNO.yaml'
 configuration = yaml.safe_load(open(config))
 
 # print('UQ Method: ' +  configuration['UQ'])
@@ -237,12 +237,26 @@ for jj in range(len(uqs)):
                 pred_set_encoded, pred_set_encoded_std, mse, mae = validation_SWAG(model, swag_model, test_a, test_u_encoded, step, T_out, samples=5)
 
         if configuration['UQ']=='AER':
-            alpha = 0.05
-            pred_set_encoded, qhat,  mse, mae = validation_AER(model, test_a, test_u_encoded, step, T_out, alpha)
+            alpha=0.05
+            cal =  vars[np.random.choice(len(vars), size=ntest, replace=False)]  
+            cal_a = cal[...,:T_in]
+            cal_u = cal[...,T_in:T_out+T_in]
+            cal_a = a_normalizer.encode(cal_a)
+            cal_u_encoded = u_normalizer.encode(cal_u)
+            
+            cal_set_encoded, qhat, mse, mae = validation_AER(model, cal_a, cal_u_encoded, step, T_out, alpha)
+            pred_set_encoded, qhat_pred,  mse, mae = validation_AER(model, test_a, test_u_encoded, step, T_out, alpha)
 
         if configuration['UQ']=='PRE':
             alpha=0.05
-            pred_set_encoded, qhat, mse, mae = validation_PRE(model, test_a, test_u_encoded, step, T_out, alpha, pre)
+            cal =  vars[np.random.choice(len(vars), size=ntest, replace=False)]  
+            cal_a = cal[...,:T_in]
+            cal_u = cal[...,T_in:T_out+T_in]
+            cal_a = a_normalizer.encode(cal_a)
+            cal_u_encoded = u_normalizer.encode(cal_u)
+
+            cal_set_encoded, qhat, mse, mae = validation_PRE(model, cal_a, cal_u_encoded, step, T_out, alpha, pre)
+            pred_set_encoded, qhat_pred, mse, mae = validation_PRE(model, test_a, test_u_encoded, step, T_out, alpha, pre)
 
         t2 = default_timer()
 

@@ -1,4 +1,5 @@
-UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
+# UQ: ['Dropout', 'Ensemble', 'Bayesian', 'SWAG', 'AER', 'PRE']
+UQ: ['Bayesian', 'AER', 'PRE']
 Dist : 'out' #in or out
 Case: 'Navier-Stokes'
 Field: 'u v p'
@@ -25,7 +26,7 @@ Runs:
   Deterministic: 'wan-sensor'
   Dropout: 'dense-map'
   Ensemble: ['chill-bourbon', 'unary-player', 'magenta-flour', 'smart-flute', 'proper-rebase']
-  Bayesian: 'gold-gear'
+  Bayesian: 'savage-array'
   SWAG: 'nondeterministic-message'
   AER: 'wan-sensor'
   PRE: 'wan-sensor'
