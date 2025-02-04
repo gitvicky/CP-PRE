@@ -348,6 +348,8 @@ t_idx= 35
 
 # Create figure and axis
 fig, ax = plt.subplots()
+plt.xlabel('R')
+plt.ylabel('Z')
 
 # Plot the image
 im = ax.imshow(pred_pred_residual[idx, t_idx], cmap='magma')
@@ -371,8 +373,7 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 # Set labels and title
-ax.set_xlabel(r'$x$', fontsize=36)
-ax.set_ylabel(r'$y$', fontsize=36)
+
 ax.set_title(r'PRE: $D_{}(\rho,\phi,T)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_residual_temp.svg", format="svg",transparent=True, bbox_inches='tight')
@@ -382,7 +383,8 @@ plt.show()
 
 # Create figure and axis
 fig, ax = plt.subplots()
-
+plt.xlabel(r'$R$')
+plt.ylabel(r'$Z$')
 # Plot the image
 im = ax.imshow(prediction_sets[1][t_idx], cmap='magma')
 
@@ -405,8 +407,6 @@ ax.set_xticks([])
 ax.set_yticks([])
 
 # Set labels and title
-ax.set_xlabel(r'$x$', fontsize=36)
-ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_jorek_temp_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
@@ -417,6 +417,12 @@ plt.show()
 
 # Create figure and axis
 fig, ax = plt.subplots()
+
+# Set labels and title
+plt.xlabel(r'$R$')
+plt.ylabel(r'$Z$')
+ax.set_title(r'Absolute Error: $(T)$', fontsize=36)
+
 
 # Plot the image
 im = ax.imshow(torch.abs(u_out_pred[idx,2,..., t_idx]-pred_pred[idx,2,..., t_idx]), cmap='magma')
@@ -439,10 +445,6 @@ cbar.ax.tick_params(labelsize=36)
 ax.set_xticks([])
 ax.set_yticks([])
 
-# Set labels and title
-ax.set_xlabel(r'$x$', fontsize=36)
-ax.set_ylabel(r'$y$', fontsize=36)
-ax.set_title(r'Absolute Error: $(T)$', fontsize=36)
 
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_abs_err_temp.svg", format="svg",transparent=True, bbox_inches='tight')
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/jorek_abs_err_temp.pdf", format="pdf",transparent=True, bbox_inches='tight')

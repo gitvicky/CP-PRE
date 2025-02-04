@@ -208,7 +208,7 @@ u = u.unsqueeze(1) #Adding the variable channel
 norms = np.load(model_loc + '/FNO_Wave_cyclic-muntin_norms.npz')
 in_normalizer, out_normalizer = normalisation(configuration['Normalisation Strategy'], norms)
 
-cal_in, cal_out = data_loader(u[:500], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
+cal_in, cal_out = data_loader(u[:1000], configuration['T_in'], configuration['T_out'], in_normalizer, out_normalizer, dataloader=False)
 cal_pred, mse, mae = validation_AR(model, cal_in, cal_out, configuration['Step'], configuration['T_out'])
 cal_out = out_normalizer.decode(cal_out)
 cal_pred = out_normalizer.decode(cal_pred)
