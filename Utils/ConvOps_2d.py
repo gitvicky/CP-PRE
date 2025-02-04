@@ -15,7 +15,13 @@ import torch.nn.functional as F
 
 def get_stencil(dims, deriv_order, taylor_order=2):
     if dims == 1:
-        if deriv_order == 2 and taylor_order == 2:
+        if deriv_order == 0:  # Identity convolution
+            return torch.tensor([
+                [0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0]
+            ], dtype=torch.float32)
+        elif deriv_order == 2 and taylor_order == 2:
             return torch.tensor([
                 [0, 1, 0],
                 [0, -2, 0],

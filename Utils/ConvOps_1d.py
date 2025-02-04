@@ -6,7 +6,7 @@
 Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator 
 - prefefined using a Finite Difference Scheme. 
 
-Data used for all operations should be in the shape: BS, Nt, Nx, Ny
+Data used for all operations should be in the shape: BS, Nt, Nx
 """
 import numpy as np 
 import torch 
@@ -16,7 +16,13 @@ import torch.nn.functional as F
 def get_stencil(dims, deriv_order, taylor_order=2):
 
     if dims == 1:
-        if deriv_order == 2 and taylor_order == 2:
+        if deriv_order == 0:  # Identity convolution
+            return torch.tensor([
+                [0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0]
+            ], dtype=torch.float32)
+        elif deriv_order == 2 and taylor_order == 2:
             return torch.tensor([
                 [0, 1, 0],
                 [0, -2, 0],
@@ -106,14 +112,14 @@ class ConvOperator():
 
     def convolution(self, field, kernel=None):
         """
-        Performs 3D derivative convolution.
+        Performs 2D derivative convolution.
 
         Args:
             f (torch.Tensor): The input field tensor.
             k (torch.Tensor): The convolution kernel tensor.
 
         Returns:
-            torch.Tensor: The result of the 3D derivative convolution.
+            torch.Tensor: The result of the 2D derivative convolution.
         """
         if kernel != None: 
             self.kernel = kernel
