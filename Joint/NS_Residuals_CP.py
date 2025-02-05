@@ -477,3 +477,94 @@ plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_ns_mom_qhat.pdf", forma
 plt.show()
 
 # %%
+#Boundary Conditions 
+
+#PRE over the boundary conditions - Periodic
+def periodic_bc_residual(u, wall='right'):
+    """Apply periodic boundary conditions using edge values"""
+    if wall == 'top':
+        res = u[...,0, :] - u[...,-1, :]   # Top boundary equals bottom boundary
+    if wall == 'bottom':
+        res = u[...,-1, :]- u[...,0, :]   # Bottom boundary equals top boundary
+    if wall == 'left':
+        res =  u[...,:, 0] - u[...,:, -1]   # Left boundary equals right boundary
+    if wall=='right':
+        res = u[...,:, -1] - u[...,:, 0]   # Right boundary equals left boundary
+    return res * dx
+
+w_cal = cal_pred[:, -1].permute(0, 3, 1, 2)
+w_out = pred_out[:, -1].permute(0, 3, 1, 2)
+w_pred = pred_pred[:, -1].permute(0, 3, 1, 2)
+
+w_cal_bc_residual =  periodic_bc_residual(w_cal)
+w_pred_bc_residual = periodic_bc_residual(w_pred)
+
+modulation = modulation_func(w_cal_bc_residual.numpy(), np.zeros(w_cal_bc_residual.shape))
+ncf_scores = ncf_metric_joint(w_cal_bc_residual.numpy(), np.zeros(w_cal_bc_residual.shape), modulation)
+
+#Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [- qhat*modulation, + qhat*modulation]
+    emp_cov_res.append(emp_cov_joint(prediction_sets, w_pred_bc_residual.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+# %%
+x_values = x
+pred_residual = w_pred_bc_residual
+
+alpha = 0.5
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [- qhat*modulation,  + qhat*modulation]
+
+import matplotlib as mpl 
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 20
+t_idx = 10
+
+plt.plot(x_values, w_pred_bc_residual[idx, t_idx], label='PRE', color='black',lw=4, ls='--', alpha=0.75)
+plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Joint', color='navy',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Joint', color='blue',lw=4, ls='--',  alpha=0.75)
+
+plt.xlabel(r'$y$', fontsize=36)
+plt.ylabel(r'$D_{BC}(w)$', fontsize=36)
+
+# # Customize x-axis ticks
+# plt.xticks( # 5 ticks from min to max
+#     fontsize=36  # Increase font size
+# )
+# plt.yticks( # 5 ticks from min to max
+#         np.linspace(-0.002, 0.002, 5),
+#     fontsize=36  # Increase font size
+# )
+plt.title("Joint CP", fontsize=36)
+plt.legend(fontsize=36)
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_NS_BC.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_NS_BC.pdf", format="pdf", bbox_inches='tight')
+plt.show()
+# %%

@@ -320,7 +320,7 @@ print('Calibration Error (MAE) : %.3e' % (mae))
 # %% 
 #Calibration based on PRE: 
 
-equation = 'continuity' #continuity, momentum, energy, induction, divergence
+equation = 'induction' #continuity, momentum, energy, induction, divergence
 
 if equation == 'continuity':
 # #Using the Continuity Equation. 
@@ -546,3 +546,37 @@ plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_mhd_" + equation + "_qh
 plt.show()
 
 # %%
+#Slice Plots 
+
+idx = 10
+y_pos = 45
+time = 10
+plt.figure()
+plt.plot(y[1:-1], pred_residual[idx, time, :, y_pos], label='PRE', alpha=0.8,  color = 'firebrick')
+plt.plot(y[1:-1], prediction_sets[0][time, :, y_pos], label='Lower', alpha=0.8,  color = 'teal', ls='--')
+plt.plot(y[1:-1], prediction_sets[1][time, :, y_pos], label='Upper', alpha=0.8,  color = 'navy', ls='--')
+# plt.plot(y[1:-1], val_residual[idx, time, :, y_pos], label='Solution', alpha=0.8,  color = 'black')
+plt.legend()
+plt.xlabel(r'$x$')
+plt.ylabel(r'PRE: $D_{induction}(\vec{v}, \vec{B})$')
+plt.title('Joint')
+plt.grid() #Comment out if you dont want grids.
+mpl.rcParams['xtick.minor.visible']=True
+mpl.rcParams['font.size']=45
+mpl.rcParams['figure.figsize']=(16,16)
+mpl.rcParams['xtick.minor.visible']=True
+mpl.rcParams['axes.linewidth']= 3
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] =15
+plt.rcParams['ytick.major.size'] =15
+plt.rcParams['xtick.minor.size'] =10
+plt.rcParams['ytick.minor.size'] =10
+plt.rcParams['xtick.major.width'] =5
+plt.rcParams['ytick.major.width'] =5
+plt.rcParams['xtick.minor.width'] =5
+plt.rcParams['ytick.minor.width'] =5
+mpl.rcParams['axes.titlepad'] = 20
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/induction_x_joint.svg", format="svg", bbox_inches='tight', transparent='True')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/induction_x_joint.pdf", format="pdf", bbox_inches='tight', transparent='True')
+plt.show()
+# %% 

@@ -24,7 +24,7 @@ configuration = {"Case": 'Advection',
                  "Activation": 'Tanh',
                  "Normalisation Strategy": 'Identity',
                  "T_in": 1,    
-                 "T_out": 10,
+                 "T_out": 20,
                  "Step": 1,
                  "Width": 16, 
                  "Modes": 8,
@@ -85,7 +85,7 @@ from pyDOE import lhs
 
 #Obtaining the exact and FD solution of the 1D Advection Equation. 
 Nx = 200 #Number of x-points
-Nt = 50 #Number of time instances 
+Nt = 100 #Number of time instances 
 x_min, x_max = 0.0, 2.0 #X min and max
 t_end = 0.5 #time length
 v = 1.0
@@ -159,8 +159,9 @@ D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
 D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
 
 #Residual - Additive Kernels
+disc = 2
 D = ConvOperator()
-D.kernel = D_t.kernel + (v*dt/dx) * D_x.kernel
+D.kernel = D_t.kernel + (v*disc*dt/dx) * D_x.kernel
 
 ################################################################
 #Train Data
@@ -227,6 +228,9 @@ x, t, u_sol = gen_data(params)
 u_in_cal, u_out_cal = data_loader(u_sol, dataloader=False, shuffle=False)
 u_pred_cal, mse, mae = validation_AR(model, u_in_cal, u_out_cal, step, T_out)
 
+u_out_cal = u_out_cal[...,::disc]
+u_pred_cal = u_pred_cal[...,::disc]
+
 residual_out_cal = D(u_out_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
 residual_pred_cal = D(u_pred_cal.permute(0,1,3,2)[:,0])[...,1:-1, 1:-1]
 
@@ -238,6 +242,7 @@ u_in_pred = gen_ic(params)
 pred_pred, mse, mae = validation_AR(model, u_in_pred, torch.zeros((u_in_pred.shape[0], u_in_pred.shape[1], u_in_pred.shape[2], T_out)), configuration['Step'], configuration['T_out'])
 pred_pred = pred_pred.permute(0,1,3,2)[:,0]
 uu_pred = pred_pred
+uu_pred = uu_pred[:,::disc]
 pred_residual = D(uu_pred)[...,1:-1, 1:-1]
 
 # %% 
@@ -368,11 +373,61 @@ plt.rcParams['grid.alpha'] = 0.5
 plt.rcParams['grid.linestyle'] = '-'
 
 idx = 5
-t_idx = -1
+t_idx = 3
 
 plt.plot(x_values, pred_residual[idx, t_idx], label='PRE', color='black',lw=4, ls='--', alpha=0.75)
-plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Marginal', color='maroon',lw=4, ls='--',  alpha=0.75)
-plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Marginal', color='red',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[0][t_idx], label='Lower Bound', color='maroon',lw=4, ls='--',  alpha=0.75)
+plt.plot(x_values, prediction_sets[1][t_idx], label='Upper Bound', color='red',lw=4, ls='--',  alpha=0.75)
+
+plt.xlabel(r'$x$', fontsize=36)
+plt.ylabel(r'$D(u)$', fontsize=36)
+
+# Customize x-axis ticks
+plt.xticks( # 5 ticks from min to max
+    fontsize=36  # Increase font size
+)
+plt.yticks( # 5 ticks from min to max
+        # np.linspace(-0.015, 0.015, 5),
+    fontsize=36  # Increase font size
+)
+
+plt.title(r"Coarse ($dt$=0.01)", fontsize=36)
+plt.legend(fontsize=24)
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_coarse.pdf", format="pdf", bbox_inches='tight')
+plt.show()
+# %%
+
+#Paper Plots - Rebuttal 
+alpha = 0.1
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+prediction_sets = [- qhat,  + qhat]
+
+import matplotlib as mpl 
+# Set matplotlib parameters
+mpl.rcParams['xtick.minor.visible'] = True
+mpl.rcParams['font.size'] = 24
+mpl.rcParams['figure.figsize'] = (9,9)
+mpl.rcParams['axes.linewidth'] = 2
+mpl.rcParams['axes.titlepad'] = 20
+plt.rcParams['xtick.major.size'] = 10
+plt.rcParams['ytick.major.size'] = 10
+plt.rcParams['xtick.minor.size'] = 5.0
+plt.rcParams['ytick.minor.size'] = 5.0
+plt.rcParams['xtick.major.width'] = 0.8
+plt.rcParams['ytick.major.width'] = 0.8
+plt.rcParams['xtick.minor.width'] = 0.6
+plt.rcParams['ytick.minor.width'] = 0.6
+plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['grid.alpha'] = 0.5
+plt.rcParams['grid.linestyle'] = '-'
+
+idx = 5
+t_idx = 5
+
+plt.plot(x, test_u[idx, 0, :, t_idx-1], label='Ground Truth', color='black',lw=4, ls='--', alpha=0.75)
+plt.plot(x, pred_test[idx, 0, :, t_idx-1], label='PRE-CP', color='blue',lw=4, ls='--', alpha=0.75)
+# plt.plot(x, pred_test_bad[idx, 0, :, t_idx-1], label='Bad Model', color='red',lw=4, ls='--', alpha=0.75)
 
 plt.xlabel(r'$x$', fontsize=36)
 plt.ylabel(r'$D(u)$', fontsize=36)
@@ -386,9 +441,24 @@ plt.yticks( # 5 ticks from min to max
     fontsize=36  # Increase font size
 )
 
-plt.title("Marginal CP", fontsize=36)
-plt.legend(fontsize=36)
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection.svg", format="svg", bbox_inches='tight')
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection.pdf", format="pdf", bbox_inches='tight')
+plt.title("Model Performance", fontsize=36)
+plt.legend(fontsize=24)
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_goodbad.svg", format="svg", bbox_inches='tight')
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_goodbad.pdf", format="pdf", bbox_inches='tight')
+plt.show()
+
+# %%
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, color='black', alpha=0.6, lw=5.0, label='Ideal')
+plt.plot(1-alpha_levels, emp_cov_coarse, color='maroon', ls='--', alpha=0.6, lw=4.0, label='Coarse')
+plt.plot(1-alpha_levels, emp_cov_res, ls='-.', color='navy', alpha=0.8, lw=3.0, label='Fine')
+plt.xlabel(r'1-$\alpha$', fontsize=36)
+plt.ylabel(r'Empirical Coverage', fontsize=36)
+plt.title('Coverage', fontsize=36)
+plt.legend(fontsize=24)
+
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_coverage.svg", format="svg", bbox_inches='tight')
+plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_advection_disc_coverage.pdf", format="pdf", bbox_inches='tight')
 plt.show()
 # %%
