@@ -338,16 +338,21 @@ D_tt = ConvOperator(order=2)#, scale=alpha)
 D_identity = ConvOperator(order=0) #Identity 
 D_identity.kernel = torch.tensor([0, 1, 0])
 
-D_pos = ConvOperator(conv='conv')
+D_pos = ConvOperator(conv='direct')
 D_pos.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
 
-# D_vel = ConvOperator(conv='conv')
+D_pos_spectral = ConvOperator(conv='spectral')
+D_pos_spectral.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
+
+# D_vel = ConvOperator(conv='direct')
 # D_vel.kernel = D_t.kernel + (k/m)*2*dt*D_identity(torch.tensor(x, dtype=torch.float32))
 
 # %% 
 #Position Residual 
 plt.figure()
-plt.plot(t[1:-1], D_pos(x)[0,1:-1], 'b-', label='position_residual')
+plt.plot(t[2:-1], D_pos(x)[0,2:-1], 'b-', label='direct_residual')
+plt.plot(t[2:-1], D_pos_spectral(x)[0,2:-1], 'r--', label='spectral_residual')
+
 plt.xlabel('Time')
 plt.ylabel('Residual')
 plt.title('Position Residual')
@@ -398,9 +403,9 @@ plt.legend()
 #Plotting the bounds in the residual space
 qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.5)
 
-plt.plot(t[1:-1], residual_pred[0, 1:-1], 'b-', label='PRE')
-plt.plot(t[1:-1], -qhat[1:-1], 'r--', label='Lower Bound')
-plt.plot(t[1:-1], +qhat[1:-1], 'g--', label='Upper Bound')
+plt.plot(t[2:-1], residual_pred[0, 2:-1], 'b-', label='PRE')
+plt.plot(t[2:-1], -qhat[2:-1], 'r--', label='Lower Bound')
+plt.plot(t[2:-1], +qhat[2:-1], 'g--', label='Upper Bound')
 plt.xlabel('Time')
 plt.ylabel('Residual')
 plt.title('PRE-CP : Position')
@@ -408,17 +413,15 @@ plt.legend()
 plt.grid(True)
 
 # %% 
-#Inverse - Velocity
-D_pos = ConvOperator(conv='spectral')
-D_pos.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
-pos_res = D_pos(torch.tensor(neural_sol[...,0], dtype=torch.float32))
+#Inverse - Position
+pos_res = D_pos_spectral(torch.tensor(neural_sol[...,0], dtype=torch.float32))
 pos_retrieved = D_pos.integrate(pos_res)
 # vel_retrieved = D_vel.diff_integrate(v)
 
 plt.plot(t, neural_sol[0, :, 0], 'b-', label='Actual')
 plt.plot(t, pos_retrieved[0], 'r--', label='Retrieved')
 plt.xlabel('Time')
-plt.ylabel('Velocity')
+plt.ylabel('Position')
 plt.title('Inverse')
 plt.legend()
 plt.grid(True)

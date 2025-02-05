@@ -54,11 +54,11 @@ class ConvOperator():
         order (int): The order of derivation (1 or 2)
         scale (float): Scaling factor for the kernel
         taylor_order (int): Order of accuracy for Taylor expansion
-        conv (str): Convolution method ('conv' or 'spectral')
+        conv (str): Convolution method ('direct' or 'spectral')
         device (str): Device to use for computations ('cpu' or 'cuda')
         requires_grad (bool): Whether the kernel should require gradients
     """
-    def __init__(self, order=None, scale=1.0, taylor_order=2, conv='conv', 
+    def __init__(self, order=None, scale=1.0, taylor_order=2, conv='direct', 
                  device='cpu', requires_grad=False):
         try:
             self.order = order
@@ -71,7 +71,7 @@ class ConvOperator():
         except:
             pass
 
-        if conv == 'conv':
+        if conv == 'direct':
             self.conv = self.convolution
         elif conv == 'spectral':
             self.conv = self.spectral_convolution
@@ -92,13 +92,59 @@ class ConvOperator():
         if kernel is not None:
             self.kernel = kernel
 
+        #Padding
+        pad_size = kernel.size(-1) - 1
+        padded_field = F.pad(field, (pad_size, pad_size), mode='constant')
+
         # Add channel dimension for conv1d
-        field = field.unsqueeze(1)
+        print(field.shape)
+        if field.dim() == 2:
+            padded_field = padded_field.unsqueeze(1)
+        print(field.shape)
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
         
         # Perform convolution with appropriate padding
-        padding = self.kernel.shape[0] // 2
-        return F.conv1d(field, kernel, padding=padding).squeeze(1)
+        # padding = self.kernel.shape[0] // 2
+
+        directconv = F.conv1d(padded_field, kernel).squeeze(1)
+
+        return directconv[...,:-pad_size]
+
+    # def spectral_convolution(self, field, kernel=None):
+    #     """
+    #     Performs spectral convolution using the convolution theorem.
+
+    #     Args:
+    #         field (torch.Tensor): Input tensor of shape (BS, Nt)
+    #         kernel (torch.Tensor, optional): Optional custom kernel
+
+    #     Returns:
+    #         torch.Tensor: Result of the spectral convolution
+    #     """
+    #     if kernel is not None:
+    #         self.kernel = kernel
+    #     kernel = self.kernel.unsqueeze(0)
+
+    #     field_size = field.size(-1)
+    #     kernel_size = kernel.size(-1)
+
+    #     # Calculate optimal FFT size (power of 2 for efficiency)
+    #     n_fft = 2 ** torch.ceil(torch.log2(torch.tensor(field_size + kernel_size - 1)))
+    #     n_fft = int(n_fft.item())
+
+    #     # Pad signal and kernel to fft_size
+    #     padded_field = F.pad(field, (0, n_fft - field_size))
+    #     padded_kernel = F.pad(kernel, (0, n_fft - kernel_size))
+
+    #     field_fft = torch.fft.fft(padded_field, dim=1)
+    #     kernel_fft = torch.fft.fft(padded_kernel, dim=1)
+
+    #     # kernel_pad = pad_kernel(field, self.kernel)
+    #     # kernel_fft = torch.fft.fft(kernel_pad, dim=1)
+
+    #     fftconv =  torch.fft.ifft(field_fft * kernel_fft, dim=1).real
+    #     return fftconv[...,:field_size]
+
 
     def spectral_convolution(self, field, kernel=None):
         """
@@ -119,6 +165,64 @@ class ConvOperator():
         kernel_fft = torch.fft.fft(kernel_pad)
 
         return torch.fft.ifft(field_fft * kernel_fft, dim=1).real
+    
+    
+    def integrate(self, field, kernel=None, eps=1e-6):
+        """
+        Performs direct integration in the frequency domain.
+        
+        Args:
+            field (torch.Tensor): Input tensor of shape (BS, Nt)
+            kernel (torch.Tensor, optional): Optional custom kernel
+            eps (float): Small value to avoid division by zero
+
+        Returns:
+            torch.Tensor: Result of the integration operation
+        """
+        if kernel is not None:
+            self.kernel = kernel
+        
+        field_fft = torch.fft.fft(field, dim=1)
+        kernel_pad = pad_kernel(field, self.kernel)
+        kernel_fft = torch.fft.fft(kernel_pad)
+        inv_kernel_fft = 1 / (kernel_fft + eps)
+        
+        return torch.fft.ifft(field_fft * inv_kernel_fft, dim=1).real
+
+    # def integrate(self, field, kernel=None, eps=1e-6):
+    #     """
+    #     Performs direct integration in the frequency domain.
+        
+    #     Args:
+    #         field (torch.Tensor): Input tensor of shape (BS, Nt)
+    #         kernel (torch.Tensor, optional): Optional custom kernel
+    #         eps (float): Small value to avoid division by zero
+
+    #     Returns:
+    #         torch.Tensor: Result of the integration operation
+    #     """
+    #     if kernel is not None:
+    #         self.kernel = kernel
+    #     kernel = self.kernel.unsqueeze(0)
+
+    #     field_size = field.size(-1)
+    #     kernel_size = kernel.size(-1)
+
+    #     # Calculate optimal FFT size (power of 2 for efficiency)
+    #     n_fft = 2 ** torch.ceil(torch.log2(torch.tensor(field_size + kernel_size - 1)))
+    #     n_fft = int(n_fft.item())
+
+    #     # Pad signal and kernel to fft_size
+    #     padded_field = F.pad(field, (0, n_fft - field_size))
+    #     padded_kernel = F.pad(kernel, (0, n_fft - kernel_size))
+
+    #     field_fft = torch.fft.fft(padded_field, dim=1)
+    #     kernel_fft = torch.fft.fft(padded_kernel, dim=1)
+
+    #     inv_kernel_fft = 1 / (kernel_fft + eps)
+    #     inv_field = torch.fft.ifft(field_fft * inv_kernel_fft, dim=1).real
+        
+    #     return inv_field[...,:field_size]
 
     def diff_integrate(self, field, kernel=None, eps=1e-6):
         """
@@ -142,27 +246,7 @@ class ConvOperator():
         
         return torch.fft.ifft(field_fft * kernel_fft * inv_kernel_fft, dim=1).real
 
-    def integrate(self, field, kernel=None, eps=1e-6):
-        """
-        Performs direct integration in the frequency domain.
-        
-        Args:
-            field (torch.Tensor): Input tensor of shape (BS, Nt)
-            kernel (torch.Tensor, optional): Optional custom kernel
-            eps (float): Small value to avoid division by zero
-
-        Returns:
-            torch.Tensor: Result of the integration operation
-        """
-        if kernel is not None:
-            self.kernel = kernel
-        
-        field_fft = torch.fft.fft(field, dim=1)
-        kernel_pad = pad_kernel(field, self.kernel)
-        kernel_fft = torch.fft.fft(kernel_pad)
-        inv_kernel_fft = 1 / (kernel_fft + eps)
-        
-        return torch.fft.ifft(field_fft * inv_kernel_fft, dim=1).real
+    
 
     def forward(self, field):
         """
@@ -187,3 +271,22 @@ class ConvOperator():
             torch.Tensor: Result of the derivative convolution
         """
         return self.forward(inputs)
+    
+
+# %% 
+# #Example Usage 
+# from matplotlib import pyplot as plt 
+
+# # Random Signal
+# signal = torch.randn(1,100)  # (batch_size, channels, signal_length)
+
+# D_tt = ConvOperator(order=2, taylor_order=2, conv='direct')
+# directconv = D_tt(signal)
+
+# D_tt = ConvOperator(order=2, taylor_order=2, conv='spectral')
+# fftconv = D_tt(signal)
+
+# plt.plot(fftconv[0], label='spectral')
+# plt.plot(directconv[0], label='direct')
+# plt.legend()
+# %%
