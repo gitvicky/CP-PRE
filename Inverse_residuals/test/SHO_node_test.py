@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from torchdiffeq import odeint
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import sys
 sys.path.append("/Users/Vicky/Documents/UKAEA/Code/Uncertainty_Quantification/PDE_Residuals")
@@ -222,6 +223,49 @@ def compare_solutions(oscillator, neural_ode, t_span, initial_state):
             numerical_solution,
             neural_solution.detach().numpy())
 
+def evaluate(oscillator, neural_ode, t_span, n_points, x_range, v_range, n_solves):
+    """
+    Compare numerical and neural ODE solutions.
+    
+    Args:
+        oscillator (HarmonicOscillator): Oscillator instance
+        neural_ode (ODEFunc): Trained neural network
+        t_span (tuple): Time span (t_start, t_end)
+        n_points: spatial points
+        x_range: domain
+        v_range: domain
+        n_solves: size of the dataset
+        initial_state (np.ndarray): Initial state x0, v0]
+        
+    Returns:
+        tuple: Time points and solutions (numerical and neural)
+    """
+    t = torch.linspace(t_span[0], t_span[1], 100)
+    
+    num_solns = []
+    neural_solns = []
+
+    for ii in tqdm(range(n_solves)):
+        
+        x0 = np.random.uniform(*x_range)
+        v0 = np.random.uniform(*v_range)
+        initial_state = np.array([x0, v0])
+
+        # Numerical solution
+        _, numerical_solution = oscillator.solve_ode(
+            t_span, initial_state, t.numpy())
+        
+        # Neural ODE solution
+        state_0 = torch.FloatTensor(initial_state)
+        neural_solution = odeint(neural_ode, state_0, t)
+
+        num_solns.append(numerical_solution)
+        neural_solns.append(neural_solution.detach().numpy())
+    
+    return (t.numpy(), 
+            np.asarray(num_solns),
+            np.asarray(neural_solns))
+
 
 def plot_comparison(t, numerical_sol, neural_sol):
     """
@@ -280,6 +324,12 @@ plot_comparison(t, numerical_sol, neural_sol)
 
 # %% 
 #PRE Estimations
+
+soln = neural_sol
+x = torch.tensor(soln[:, 0], dtype=torch.float32).unsqueeze(0)
+v = torch.tensor(soln[:, 1], dtype=torch.float32).unsqueeze(0)
+
+
 from Utils.ConvOps_0d import ConvOperator
 dt = t[1]-t[0]
 D_t = ConvOperator(order=1)#, scale=alpha)
@@ -288,33 +338,101 @@ D_tt = ConvOperator(order=2)#, scale=alpha)
 D_identity = ConvOperator(order=0) #Identity 
 D_identity.kernel = torch.tensor([0, 1, 0])
 
-D_pos = ConvOperator()
+D_pos = ConvOperator(conv='conv')
 D_pos.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
 
-D_vel = ConvOperator()
-D_vel.kernel = D_t.kernel + (k/m)*2*dt*D_identity.kernel
+# D_vel = ConvOperator(conv='conv')
+# D_vel.kernel = D_t.kernel + (k/m)*2*dt*D_identity(torch.tensor(x, dtype=torch.float32))
 
-x = torch.tensor(neural_sol[:, 0:1], dtype=torch.float32)
-v = torch.tensor(neural_sol[:, 1:2], dtype=torch.float32)
-
-res = D_vel(v)
-plt.plot(t, res)
-
-# %%
-#Inverse
-
-D_vel = ConvOperator(conv='spectral')
-D_vel.kernel = D_t.kernel + (k/m)*2*dt*D_identity.kernel
-vel_res = D_vel(v)
-vel_retrieved = D_vel.integrate(vel_res)
-# vel_retrieved = D_vel.diff_integrate(v)
-
-plt.plot(t, numerical_sol[:, 0], 'b-', label='Actual')
-plt.plot(t, neural_sol[:, 0], 'r--', label='Retrieved')
+# %% 
+#Position Residual 
+plt.figure()
+plt.plot(t[1:-1], D_pos(x)[0,1:-1], 'b-', label='position_residual')
 plt.xlabel('Time')
-plt.ylabel('Velocity')
+plt.ylabel('Residual')
+plt.title('Position Residual')
 plt.legend()
 plt.grid(True)
 
 
+# #Velocity Residual 
+# plt.figure()
+# plt.plot(t[1:-1], D_vel(v)[0,1:-1], 'b-', label='velocity_residual')
+# plt.xlabel('Time')
+# plt.ylabel('Residual')
+# plt.title('Velocity Residual')
+# plt.legend()
+# plt.grid(True)
+
+
+# %%
+#Performing PRE-CP
+from Neural_PDE.UQ.inductive_cp import * 
+
+t, numerical_sol, neural_sol = evaluate(
+    oscillator, func, t_span, n_points, x_range=(-2,2), v_range=(-2,2), n_solves=500)
+
+pos = torch.tensor(neural_sol[...,0], dtype=torch.float32)
+res = D_pos(pos)
+residual_cal = res[:400]
+residual_pred = res[400:]
+
+ncf_scores = np.abs(residual_cal) 
+
+#Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+emp_cov_res = []
+for alpha in tqdm(alpha_levels):
+    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+    prediction_sets = [- qhat, + qhat]
+    emp_cov_res.append(emp_cov(prediction_sets, residual_pred.numpy()))
+
+plt.figure()
+plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+plt.xlabel('1-alpha')
+plt.ylabel('Empirical Coverage')
+plt.legend()
+
+# %% 
+#Plotting the bounds in the residual space
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.5)
+
+plt.plot(t[1:-1], residual_pred[0, 1:-1], 'b-', label='PRE')
+plt.plot(t[1:-1], -qhat[1:-1], 'r--', label='Lower Bound')
+plt.plot(t[1:-1], +qhat[1:-1], 'g--', label='Upper Bound')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('PRE-CP : Position')
+plt.legend()
+plt.grid(True)
+
+# %% 
+#Inverse - Velocity
+D_pos = ConvOperator(conv='spectral')
+D_pos.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
+pos_res = D_pos(torch.tensor(neural_sol[...,0], dtype=torch.float32))
+pos_retrieved = D_pos.integrate(pos_res)
+# vel_retrieved = D_vel.diff_integrate(v)
+
+plt.plot(t, neural_sol[0, :, 0], 'b-', label='Actual')
+plt.plot(t, pos_retrieved[0], 'r--', label='Retrieved')
+plt.xlabel('Time')
+plt.ylabel('Velocity')
+plt.title('Inverse')
+plt.legend()
+plt.grid(True)
+
+# %%
+# Attempting to invert the residual bounds to the velocity space just using the convolution theorem
+inv_qhat= D_pos.integrate(torch.tensor(qhat, dtype=torch.float32).unsqueeze(0))[0]
+
+plt.plot(t[1:-1], pos[0, 1:-1], 'b-', label='PRE')
+plt.plot(t[1:-1], -inv_qhat[1:-1], 'r--', label='Lower Bound')
+plt.plot(t[1:-1], +inv_qhat[1:-1], 'g--', label='Upper Bound')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('PRE-CP-inverse : Position')
+plt.legend()
+plt.grid(True)
 # %%
