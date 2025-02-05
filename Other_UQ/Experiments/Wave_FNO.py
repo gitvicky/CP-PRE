@@ -167,6 +167,7 @@ with Run(mode='online') as run:
     ################################################################
     # training and evaluation
     ################################################################
+    import Bayesian_Models as Models
     if configuration['UQ']=='Deterministic':
         from Models.Base_FNO import *
         model = FNO_multi2d(T_in, step, modes, modes, num_vars, width_time)
