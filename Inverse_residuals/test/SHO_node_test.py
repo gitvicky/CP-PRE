@@ -374,6 +374,9 @@ from Neural_PDE.UQ.inductive_cp import *
 t, numerical_sol, neural_sol = evaluate(
     oscillator, func, t_span, n_points, x_range=(-2,2), v_range=(-2,2), n_solves=500)
 
+np.save("ODE_outputs", numerical_sol)
+np.save("Nueral_outputs", numerical_sol)
+
 pos = torch.tensor(neural_sol[...,0], dtype=torch.float32)
 res = D_pos(pos)
 residual_cal = res[:400]
