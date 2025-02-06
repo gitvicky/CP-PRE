@@ -127,7 +127,7 @@ class ConvOperator():
         return convfft
 
 
-    def diff(self, field, kernel=None, eps=1e-6, correlation=False):
+    def differentiate(self, field, kernel=None, eps=1e-6, correlation=False):
         """
         Performs integration using the convolution theorem.
         
@@ -238,31 +238,31 @@ class ConvOperator():
     
 
 # %% 
-#Example Usage 
-from matplotlib import pyplot as plt 
+# #Example Usage 
+# from matplotlib import pyplot as plt 
 
-# Random Signal
-signal = torch.randn(1,100)  # (batch_size, channels, signal_length)
+# # Random Signal
+# signal = torch.randn(1,100)  # (batch_size, channels, signal_length)
 
-D_tt = ConvOperator(order=2, taylor_order=2, conv='direct')
-directconv = D_tt(signal)
+# D_tt = ConvOperator(order=2, taylor_order=2, conv='direct')
+# directconv = D_tt(signal)
 
-D_tt = ConvOperator(order=2, taylor_order=2, conv='spectral')
-fftconv = D_tt(signal)
+# D_tt = ConvOperator(order=2, taylor_order=2, conv='spectral')
+# fftconv = D_tt(signal)
 
-mine = D_tt.diff(signal)
+# mine = D_tt.differentiate(signal)
 
-plt.figure()
-plt.plot(fftconv[0], label='spectral')
-plt.plot(directconv[0], label='direct')
-plt.plot(mine[0], label='mine')
-plt.legend()
+# plt.figure()
+# plt.plot(fftconv[0], label='spectral')
+# plt.plot(directconv[0], label='direct')
+# plt.plot(mine[0], label='mine')
+# plt.legend()
 
-# %% 
-retrieved_sgnal= D_tt.integrate(mine)
+# # %% 
+# retrieved_sgnal= D_tt.integrate(mine)
 
-plt.figure()
-plt.plot(signal[0], label='actual')
-plt.plot(retrieved_sgnal[0,1:-1], label='retreievd')
-plt.legend()
-# %%
+# plt.figure()
+# plt.plot(signal[0], label='actual')
+# plt.plot(retrieved_sgnal[0,1:-1], label='retreievd')
+# plt.legend()
+# # %%

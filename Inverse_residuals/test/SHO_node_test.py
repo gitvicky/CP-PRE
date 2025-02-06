@@ -344,14 +344,11 @@ D_pos.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
 D_pos_spectral = ConvOperator(conv='spectral')
 D_pos_spectral.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
 
-# D_vel = ConvOperator(conv='direct')
-# D_vel.kernel = D_t.kernel + (k/m)*2*dt*D_identity(torch.tensor(x, dtype=torch.float32))
-
 # %% 
 #Position Residual 
 plt.figure()
-plt.plot(t[2:-1], D_pos(x)[0,2:-1], 'b-', label='direct_residual')
-plt.plot(t[2:-1], D_pos_spectral(x)[0,2:-1], 'r--', label='spectral_residual')
+plt.plot(t[1:-1], D_pos(x)[0,1:-1], 'b-', label='direct_residual')
+plt.plot(t[1:-1], D_pos_spectral(x)[0,1:-1], 'r--', label='spectral_residual')
 
 plt.xlabel('Time')
 plt.ylabel('Residual')
@@ -401,11 +398,11 @@ plt.legend()
 
 # %% 
 #Plotting the bounds in the residual space
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.5)
+qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.1)
 
-plt.plot(t[2:-1], residual_pred[0, 2:-1], 'b-', label='PRE')
-plt.plot(t[2:-1], -qhat[2:-1], 'r--', label='Lower Bound')
-plt.plot(t[2:-1], +qhat[2:-1], 'g--', label='Upper Bound')
+plt.plot(t[1:-1], residual_pred[0, 1:-1], 'b-', label='PRE')
+plt.plot(t[1:-1], -qhat[1:-1], 'r--', label='Lower Bound')
+plt.plot(t[1:-1], +qhat[1:-1], 'g--', label='Upper Bound')
 plt.xlabel('Time')
 plt.ylabel('Residual')
 plt.title('PRE-CP : Position')
@@ -414,12 +411,12 @@ plt.grid(True)
 
 # %% 
 #Inverse - Position
-pos_res = D_pos_spectral(torch.tensor(neural_sol[...,0], dtype=torch.float32))
-pos_retrieved = D_pos.integrate(pos_res)
+pos_res = D_pos.differentiate(torch.tensor(neural_sol[...,0], dtype=torch.float32), correlation=True)
+pos_retrieved = D_pos.integrate(pos_res, correlation=True)
 # vel_retrieved = D_vel.diff_integrate(v)
 
-plt.plot(t, neural_sol[0, :, 0], 'b-', label='Actual')
-plt.plot(t, pos_retrieved[0], 'r--', label='Retrieved')
+plt.plot(neural_sol[0, 1:-1, 0], 'b-', label='Actual')
+plt.plot(pos_retrieved[0,1:-1], 'r--', label='Retrieved')
 plt.xlabel('Time')
 plt.ylabel('Position')
 plt.title('Inverse')
@@ -438,19 +435,5 @@ plt.ylabel('Residual')
 plt.title('PRE-CP-inverse : Position')
 plt.legend()
 plt.grid(True)
-# %%
-import torch
-from fft_conv_pytorch import fft_conv, FFTConv1d
-
-# Create dummy data.  
-#     Data shape: (batch, channels, length)
-#     Kernel shape: (out_channels, in_channels, kernel_size)
-#     Bias shape: (out channels, )
-# For ordinary 1D convolution, simply set batch=1.
-signal = torch.randn(1, 1, 1024)
-kernel = torch.randn(1, 1, 3)
-
-# Functional execution.  (Easiest for generic use cases.)
-out = fft_conv(signal, kernel)
 
 # %%
