@@ -439,3 +439,18 @@ plt.title('PRE-CP-inverse : Position')
 plt.legend()
 plt.grid(True)
 # %%
+import torch
+from fft_conv_pytorch import fft_conv, FFTConv1d
+
+# Create dummy data.  
+#     Data shape: (batch, channels, length)
+#     Kernel shape: (out_channels, in_channels, kernel_size)
+#     Bias shape: (out channels, )
+# For ordinary 1D convolution, simply set batch=1.
+signal = torch.randn(1, 1, 1024)
+kernel = torch.randn(1, 1, 3)
+
+# Functional execution.  (Easiest for generic use cases.)
+out = fft_conv(signal, kernel)
+
+# %%
