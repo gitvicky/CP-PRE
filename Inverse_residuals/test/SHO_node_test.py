@@ -416,7 +416,7 @@ pos_retrieved = D_pos.integrate(pos_res, correlation=True)
 # vel_retrieved = D_vel.diff_integrate(v)
 
 plt.plot(neural_sol[0, 1:-1, 0], 'b-', label='Actual')
-plt.plot(pos_retrieved[0,1:-1], 'r--', label='Retrieved')
+plt.plot(pos_retrieved[0,2:-2], 'r--', label='Retrieved')
 plt.xlabel('Time')
 plt.ylabel('Position')
 plt.title('Inverse')
