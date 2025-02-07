@@ -127,7 +127,7 @@ class ConvOperator():
         return convfft
 
 
-    def differentiate(self, field, kernel=None, eps=1e-6, correlation=False):
+    def differentiate(self, field, kernel=None, eps=1e-6, correlation=False, slice_pad=True):
         """
         Performs integration using the convolution theorem.
         
@@ -148,26 +148,34 @@ class ConvOperator():
 
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size,pad_size), mode='constant')
-        field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
+        field_fft = torch.fft.rfftn(padded_field.float(), dim=tuple(range(2, field.ndim)))
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
-
 
         kernel_padding = [
             pad
             for i in reversed(range(2, padded_field.ndim))
             for pad in [0, padded_field.size(i) - kernel.size(i)]
         ]
-        padded_kernel = f.pad(kernel, kernel_padding)
+        padded_kernel = F.pad(kernel, kernel_padding)
 
-        kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
+        kernel_fft = torch.fft.rfftn(padded_kernel.float(), dim = tuple(range(2, field.ndim)))
         if correlation==True:
             kernel_fft.imag *= -1
 
-        output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim))).squeeze(1)
-        return output
+        output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim)))
+
+        # Remove extra padded values
+        if slice_pad==True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+            output = output[crop_slices].contiguous()
+
+        return output.squeeze(1)
   
     
-    def integrate(self, field, kernel=None, correlation=False, eps=1e-6):
+    def integrate(self, field, kernel=None, correlation=False, slice_pad=True, eps=1e-6):
         """
         Performs direct integration in the frequency domain.
         
@@ -198,7 +206,7 @@ class ConvOperator():
             for i in reversed(range(2, padded_field.ndim))
             for pad in [0, padded_field.size(i) - kernel.size(i)]
         ]
-        padded_kernel = f.pad(kernel, kernel_padding)
+        padded_kernel = F.pad(kernel, kernel_padding)
 
         kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
         # kernel_fft.imag *= -1
@@ -208,8 +216,17 @@ class ConvOperator():
         if correlation == True:
             inv_kernel_fft.imag *= -1 
 
-        output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim))).squeeze(1)
-        return output
+        output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim)))
+
+                # Remove extra padded values
+        if slice_pad == True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+            output = output[crop_slices].contiguous()
+
+        return output.squeeze(1)
 
 
     def forward(self, field):

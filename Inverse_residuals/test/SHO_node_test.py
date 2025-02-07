@@ -349,6 +349,7 @@ D_pos_spectral.kernel = m*D_tt.kernel + dt**2*k*D_identity.kernel
 plt.figure()
 plt.plot(t[1:-1], D_pos(x)[0,1:-1], 'b-', label='direct_residual')
 plt.plot(t[1:-1], D_pos_spectral(x)[0,1:-1], 'r--', label='spectral_residual')
+plt.plot(t[1:-1], D_pos.differentiate(x, correlation=True)[0, 1:-1], 'k:', label='custom_spectral')
 
 plt.xlabel('Time')
 plt.ylabel('Residual')
@@ -372,7 +373,7 @@ plt.grid(True)
 from Neural_PDE.UQ.inductive_cp import * 
 
 t, numerical_sol, neural_sol = evaluate(
-    oscillator, func, t_span, n_points, x_range=(-2,2), v_range=(-2,2), n_solves=500)
+    oscillator, func, t_span, n_points, x_range=(-2,2), v_range=(-2,2), n_solves=5)
 
 np.save("ODE_outputs", numerical_sol)
 np.save("Nueral_outputs", numerical_sol)
@@ -382,40 +383,39 @@ res = D_pos(pos)
 residual_cal = res[:400]
 residual_pred = res[400:]
 
-ncf_scores = np.abs(residual_cal) 
+# ncf_scores = np.abs(residual_cal) 
 
-#Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
-alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
-emp_cov_res = []
-for alpha in tqdm(alpha_levels):
-    qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
-    prediction_sets = [- qhat, + qhat]
-    emp_cov_res.append(emp_cov(prediction_sets, residual_pred.numpy()))
+# #Emprical Coverage for all values of alpha to see if pred_residual lies between +- qhat. 
+# alpha_levels = np.arange(0.05, 0.95+0.1, 0.1)
+# emp_cov_res = []
+# for alpha in tqdm(alpha_levels):
+#     qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=alpha)
+#     prediction_sets = [- qhat, + qhat]
+#     emp_cov_res.append(emp_cov(prediction_sets, residual_pred.numpy()))
 
-plt.figure()
-plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
-plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
-plt.xlabel('1-alpha')
-plt.ylabel('Empirical Coverage')
-plt.legend()
+# plt.figure()
+# plt.plot(1-alpha_levels, 1-alpha_levels, label='Ideal', color ='black', alpha=0.8, linewidth=3.0)
+# plt.plot(1-alpha_levels, emp_cov_res, label='Residual' ,ls='-.', color='teal', alpha=0.8, linewidth=3.0)
+# plt.xlabel('1-alpha')
+# plt.ylabel('Empirical Coverage')
+# plt.legend()
 
-# %% 
-#Plotting the bounds in the residual space
-qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.1)
+# #Plotting the bounds in the residual space
+# qhat = calibrate(scores=ncf_scores, n=len(ncf_scores), alpha=0.1)
 
-plt.plot(t[1:-1], residual_pred[0, 1:-1], 'b-', label='PRE')
-plt.plot(t[1:-1], -qhat[1:-1], 'r--', label='Lower Bound')
-plt.plot(t[1:-1], +qhat[1:-1], 'g--', label='Upper Bound')
-plt.xlabel('Time')
-plt.ylabel('Residual')
-plt.title('PRE-CP : Position')
-plt.legend()
-plt.grid(True)
+# plt.plot(t[1:-1], residual_pred[0, 1:-1], 'b-', label='PRE')
+# plt.plot(t[1:-1], -qhat[1:-1], 'r--', label='Lower Bound')
+# plt.plot(t[1:-1], +qhat[1:-1], 'g--', label='Upper Bound')
+# plt.xlabel('Time')
+# plt.ylabel('Residual')
+# plt.title('PRE-CP : Position')
+# plt.legend()
+# plt.grid(True)
 
 # %% 
 #Inverse - Position
-pos_res = D_pos.differentiate(torch.tensor(neural_sol[...,0], dtype=torch.float32), correlation=True)
-pos_retrieved = D_pos.integrate(pos_res, correlation=True)
+pos_res = D_pos.differentiate(torch.tensor(neural_sol[...,0], dtype=torch.float32), correlation=False, slice_pad=False)
+pos_retrieved = D_pos.integrate(pos_res, correlation=False, slice_pad=False)
 # vel_retrieved = D_vel.diff_integrate(v)
 
 plt.plot(neural_sol[0, 1:-1, 0], 'b-', label='Actual')
@@ -427,16 +427,17 @@ plt.legend()
 plt.grid(True)
 
 # %%
-# Attempting to invert the residual bounds to the velocity space just using the convolution theorem
-inv_qhat= D_pos.integrate(torch.tensor(qhat, dtype=torch.float32).unsqueeze(0))[0]
+# # Attempting to invert the residual bounds to the velocity space just using the convolution theorem
+# inv_qhat= D_pos.integrate(torch.tensor(qhat, dtype=torch.float32).unsqueeze(0))[0]
 
-plt.plot(t[1:-1], pos[0, 1:-1], 'b-', label='PRE')
-plt.plot(t[1:-1], -inv_qhat[1:-1], 'r--', label='Lower Bound')
-plt.plot(t[1:-1], +inv_qhat[1:-1], 'g--', label='Upper Bound')
-plt.xlabel('Time')
-plt.ylabel('Residual')
-plt.title('PRE-CP-inverse : Position')
-plt.legend()
-plt.grid(True)
+# plt.plot(t[1:-1], pos[0, 1:-1], 'b-', label='PRE')
+# plt.plot(t[1:-1], -inv_qhat[1:-1], 'r--', label='Lower Bound')
+# plt.plot(t[1:-1], +inv_qhat[1:-1], 'g--', label='Upper Bound')
+# plt.xlabel('Time')
+# plt.ylabel('Residual')
+# plt.title('PRE-CP-inverse : Position')
+# plt.legend()
+# plt.grid(True)
+
 
 # %%
