@@ -107,11 +107,14 @@ The methdology is benchmarked against several Bayesian Deep Learning Methods:
 If you use this code in your research, please cite:
 
 ```bibtex
-@inproceedings{gopakumar2025calibrated,
-  title={Calibrated Physics-Informed Uncertainty Quantification},
-  author={Gopakumar, Vignesh and Giles, Dan and Kusner, Matt J. and Deisenroth, Marc Peter and Gray, Ander and Zanisi, Lorenzo and Pamela, Stanislas},
-  booktitle={International Conference on Learning Representations},
-  year={2025}
+@misc{gopakumar2025calibratedphysicsinformeduncertaintyquantification,
+      title={Calibrated Physics-Informed Uncertainty Quantification}, 
+      author={Vignesh Gopakumar and Ander Gray and Lorenzo Zanisi and Timothy Nunn and Stanislas Pamela and Daniel Giles and Matt J. Kusner and Marc Peter Deisenroth},
+      year={2025},
+      eprint={2502.04406},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2502.04406}, 
 }
 ```
 
