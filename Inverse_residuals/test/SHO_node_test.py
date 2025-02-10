@@ -413,13 +413,13 @@ residual_pred = res[400:]
 # plt.grid(True)
 
 # %% 
-#Inverse - Position
+#Inverse - Position : To perform the inverse you need the complete information. 
 pos_res = D_pos.differentiate(torch.tensor(neural_sol[...,0], dtype=torch.float32), correlation=False, slice_pad=False)
 pos_retrieved = D_pos.integrate(pos_res, correlation=False, slice_pad=False)
 # vel_retrieved = D_vel.diff_integrate(v)
 
-plt.plot(neural_sol[0, 1:-1, 0], 'b-', label='Actual')
-plt.plot(pos_retrieved[0,2:-2], 'r--', label='Retrieved')
+plt.plot(neural_sol[0, :, 0], 'b-', label='Actual')
+plt.plot(pos_retrieved[0,1:-1], 'r--', label='Retrieved')
 plt.xlabel('Time')
 plt.ylabel('Position')
 plt.title('Inverse')
