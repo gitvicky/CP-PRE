@@ -568,3 +568,38 @@ plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_NS_BC.svg", format="svg
 plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/joint_NS_BC.pdf", format="pdf", bbox_inches='tight')
 plt.show()
 # %%
+'''
+#NS Compressible Navier-Stokes
+
+from Utils.ConvOps_2d import ConvOperator
+#Defining the required Convolutional Operations. 
+D_t = ConvOperator(domain='t', order=1)#, scale=alpha)
+D_x = ConvOperator(domain='x', order=1)#, scale=beta) 
+D_y = ConvOperator(domain='y', order=1)#, scale=beta)
+D_x_y = ConvOperator(domain=('x', 'y'), order=1)#, scale=beta)
+D_xx_yy = ConvOperator(domain=('x','y'), order=2)#, scale=gamma)
+
+#Continuity
+def residual_continuity(vars, boundary=False):
+    u, v, p, rho  = vars[:,0], vars[:, 1], vars[:, 2], vars[:, 3]
+    res = D_t(rho) + rho*(D_x_y(u) + D_x_y(v)) + (u+v)*(D_x_y(rho))
+
+    if boundary:
+        return res
+    else: 
+        return res[...,1:-1,1:-1,1:-1]
+    
+#Momentum 
+def residual_momentum(vars, boundary=False):
+    u, v, p, rho  = vars[:,0], vars[:, 1], vars[:, 2], vars[:, 3]
+
+    res_x = rho*(D_t(u) + u*D_x(u) + v*D_y(u)) - eta*D_xx_yy(u) + D_x(p) - (zeta + eta/3) + D_x(D_x(u) + D_y(v))
+    res_y = rho*(D_t(v) + u*D_x(v) + v*D_y(v))- eta*D_xx_yy(v) + D_y(p) - (zeta + eta/3) + D_y(D_x(u) + D_y(v))
+
+    if boundary:
+        return res_x + res_y
+    else: 
+        return res_x[...,1:-1,1:-1,1:-1] + res_y[...,1:-1,1:-1,1:-1]
+    
+        
+'''
