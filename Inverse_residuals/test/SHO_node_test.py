@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 import sys
 sys.path.append("/Users/Vicky/Documents/UKAEA/Code/Uncertainty_Quantification/PDE_Residuals")
-from Utils import ConvOps_1d
+# from Utils import ConvOps_1d
 # %% 
 from scipy.integrate import solve_ivp
 
@@ -312,7 +312,7 @@ t, states, derivs = generate_training_data(
 # Initialize and train neural ODE
 func = ODEFunc(hidden_dim=64)
 losses = train_neural_ode(
-    func, t, states, derivs, n_epochs=1000, batch_size=16)
+    func, t, states, derivs, n_epochs=100, batch_size=16)
 
 # Compare solutions
 initial_state = np.array([1.0, 0.0])  # x0 = 1, v0 = 0
@@ -329,6 +329,12 @@ soln = neural_sol
 x = torch.tensor(soln[:, 0], dtype=torch.float32).unsqueeze(0)
 v = torch.tensor(soln[:, 1], dtype=torch.float32).unsqueeze(0)
 
+
+t, numerical_sol, neural_sol = evaluate(
+    oscillator, func, t_span, n_points, x_range=(-2,2), v_range=(-2,2), n_solves=300)
+
+np.save("ODE_outputs_poor", numerical_sol)
+np.save("Nueral_outputs_poor", neural_sol)
 
 from Utils.ConvOps_0d import ConvOperator
 dt = t[1]-t[0]
