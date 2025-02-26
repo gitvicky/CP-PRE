@@ -11,6 +11,7 @@ Data used for all operations should be in the shape: BS, Nt, Nx
 import numpy as np 
 import torch 
 import torch.nn.functional as F
+from fft_conv_pytorch.fft_conv import * 
 
 
 def get_stencil(dims, deriv_order, taylor_order=2):
@@ -79,7 +80,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='conv', device='cpu'):
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='direct', device='cpu'):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
@@ -102,7 +103,7 @@ class ConvOperator():
         except:
             pass
 
-        if conv == 'conv': 
+        if conv == 'direct': 
             self.conv = self.convolution
         elif conv == 'spectral':
             self.conv = self.spectral_convolution
@@ -115,7 +116,7 @@ class ConvOperator():
         Performs 2D derivative convolution.
 
         Args:
-            f (torch.Tensor): The input field tensor.
+            f (torch.Tensor): The input field tensor of shape (BS, Nt, Nx)
             k (torch.Tensor): The convolution kernel tensor.
 
         Returns:
@@ -124,7 +125,13 @@ class ConvOperator():
         if kernel != None: 
             self.kernel = kernel
 
-        return F.conv2d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2)).squeeze()
+        # Add channel dimension for conv2d
+        if field.dim() == 3:
+            field = field.unsqueeze(1)
+
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+
+        return F.conv2d(field, kernel, padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2)).squeeze()
     
 
     def spectral_convolution(self, field, kernel=None):
@@ -143,65 +150,127 @@ class ConvOperator():
         if kernel != None: 
             self.kernel = kernel
 
-        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x
-        kernel_pad = pad_kernel(field, self.kernel)
-        print(kernel_pad.shape)
-        kernel_fft = torch.fft.fftn(kernel_pad)
-        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x,y
+        # Add channel dimension for conv2d
+        if field.dim() == 3:
+            field = field.unsqueeze(1)
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+        convfft = fft_conv(field, kernel, padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2)).squeeze(1)
 
-        return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2)).real
+        return convfft
+    
 
-
-    def diff_integrate(self, field, kernel=None, eps=1e-6):
+    def differentiate(self, field, kernel=None, correlation=False, slice_pad=True):
 
         """
-        Performs Integration using the convolution theorem 3D derivative convolution.
-        
-        f * g * h = f  ; h =  1 / (g+eps)
+        Performs custom differentiation using the convolution theorem.
         
         Args:
-            field (torch.Tensor): The input field tensor.
-            kernel (torch.Tensor): The convolution kernel tensor.
-            eps (float): Avoiding NaNs
+            field (torch.Tensor): Input tensor of shape (BS, Nt, Nx)
+            kernel (torch.Tensor, optional): Optional custom kernel
+
         Returns:
-            torch.Tensor: The result of the 3D Integration Operation. 
+            torch.Tensor: Result of the differentiation operation
         """
-        
-        if kernel != None: 
+
+        if kernel is not None:
             self.kernel = kernel
+
+        # Add channel dimension for conv2d
+        if field.dim() == 3:
+            field = field.unsqueeze(1)
+
+        pad_size = self.kernel.size(-1) // 2
+        padded_field = F.pad(field, (pad_size,pad_size), mode='constant')
+        field_fft = torch.fft.rfftn(padded_field.float(), dim=tuple(range(2, field.ndim)))
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+
+        kernel_padding = [
+            pad
+            for i in reversed(range(2, padded_field.ndim))
+            for pad in [0, padded_field.size(i) - kernel.size(i)]
+        ]
+        padded_kernel = F.pad(kernel, kernel_padding)
+
+        kernel_fft = torch.fft.rfftn(padded_kernel.float(), dim = tuple(range(2, field.ndim)))
         
-        kernel_pad = pad_kernel(field, self.kernel)
-        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x
-        kernel_fft = torch.fft.fftn(kernel_pad)
-        inv_kernel_fft = 1 / (kernel_fft + eps)
-        u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2)).real
-        return u_integrate
+        if correlation==True:
+            kernel_fft.imag *= -1
 
+        output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim)))
 
-    def integrate(self, field, kernel=None, eps=1e-6):
+        # Remove extra padded values
+        if slice_pad==True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+            output = output[crop_slices].contiguous()
 
+        return output.squeeze(1)
+    
+
+    def integrate(self, field, kernel=None, correlation=False, slice_pad=True, eps=1e-6):
         """
-        Performs Integration using the convolution theorem 3D derivative convolution.
-        
-        f * g * h = f  ; h =  1 / (g+eps)
+        Performs direct integration in the frequency domain.
+
+                f * g * h = f  ; h =  1 / (g+eps)
         
         Args:
-            field (torch.Tensor): The input field tensor.
-            kernel (torch.Tensor): The convolution kernel tensor.
-            eps (float): Avoiding NaNs
+            field (torch.Tensor): Input tensor of shape (BS, Nt, Nx)
+            kernel (torch.Tensor, optional): Optional custom kernel
+            eps (float): Small value to avoid division by zero
+
         Returns:
-            torch.Tensor: The result of the 3D Integration Operation. 
+            torch.Tensor: Result of the integration operation
         """
-        
-        if kernel != None: 
-            self.kernel = kernel
-        
-        kernel_pad = pad_kernel(field, self.kernel)
-        field_fft = torch.fft.fftn(field, dim=(1,2))#t,x
-        kernel_fft = torch.fft.fftn(kernel_pad)
+        if kernel is not None:
+                self.kernel = kernel
+
+        # Add channel dimension for conv2d
+        if field.dim() == 3:
+            field = field.unsqueeze(1)
+
+        pad_size = self.kernel.size(-1) // 2
+        padded_field = F.pad(field, (pad_size,pad_size), mode='constant')
+        padded_field = field
+
+        field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+
+        kernel_padding = [
+            pad
+            for i in reversed(range(2, padded_field.ndim))
+            for pad in [0, padded_field.size(i) - kernel.size(i)]
+        ]
+        padded_kernel = F.pad(kernel, kernel_padding)
+
+        kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
+        # kernel_fft.imag *= -1
+
         inv_kernel_fft = 1 / (kernel_fft + eps)
-        u_integrate = torch.fft.ifftn(field_fft * inv_kernel_fft, dim=(1,2)).real
-        return u_integrate
+
+        if correlation == True:
+            inv_kernel_fft.imag *= -1 
+
+        output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim)))
+
+            # Remove extra padded values
+        if slice_pad == True and correlation==True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+
+            # Remove extra padded values
+        if slice_pad == True and correlation==False:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(-(padded_field.size(i) - kernel.size(i) + 1),  -1, 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+
+            output = output[crop_slices].contiguous()
+
+        return output.squeeze(1)
     
 
 
@@ -210,25 +279,61 @@ class ConvOperator():
         Performs the forward pass of the derivative convolution.
 
         Args:
-            field (torch.Tensor): The input field tensor.
+            field (torch.Tensor): Input tensor of shape (BS, Nt)
 
         Returns:
-            torch.Tensor: The result of the derivative convolution.
+            torch.Tensor: Result of the derivative convolution
         """
-        return self.convolution(field, self.kernel)
+        return self.conv(field, self.kernel)
 
-    
     def __call__(self, inputs):
         """
-        Performs the forward pass computation when the instance is called.
+        Callable interface for the ConvOperator.
 
         Args:
-            inputs (torch.Tensor): The input tensor to the derivative convolution. 
-            -has to be in shape (BS, Nt, Nx, Ny)
+            inputs (torch.Tensor): Input tensor of shape (BS, Nt)
 
         Returns:
-            torch.Tensor: The result of the derivative convolution.
+            torch.Tensor: Result of the derivative convolution
         """
-        outputs = self.forward(inputs)
-        return outputs
+        return self.forward(inputs)
+
+# %% 
+#Example Usage
+import torch 
+from matplotlib import pyplot as plt 
+
+def convection_solution(initial_condition, c, dt, nt):
+    """
+    Implementation of convection equation with analytical solution u(x,t) = f(x - ct)
     
+    Args:
+        initial_condition: Tensor of shape [1, 1, Nx] containing the initial condition
+        c: Convection velocity (scalar)
+        dt: Time step
+        nt: Number of time steps
+    
+    Returns:
+        Tensor of shape [1, Nt, Nx] containing the solution
+    """
+    return torch.cat([initial_condition(torch.arange(initial_condition.shape[2]).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
+
+
+# Define parameters
+nx = 100
+nt = 50
+c = 1.0
+dt = 0.1
+
+# Initial condition function (Gaussian)
+def initial_condition(x):
+    return torch.exp(-(x - nx/2)**2 / 50).reshape(1, 1, -1)
+
+# One-liner solution
+solution = torch.cat([initial_condition(torch.arange(nx).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
+plt.plot(solution[0].T)
+
+D_t = 
+
+
+# %%

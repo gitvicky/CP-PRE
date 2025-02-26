@@ -213,26 +213,26 @@ FFTConv3d = partial(_FFTConv, ndim=3)
 
 
 # %% 
-#Example Usage 
-from matplotlib import pyplot as plt 
-import torch.nn.functional as F
+# #Example Usage 
+# from matplotlib import pyplot as plt 
+# import torch.nn.functional as F
 
-# Create dummy data.  
-#     Data shape: (batch, channels, length)
-#     Kernel shape: (out_channels, in_channels, kernel_size)
-#     Bias shape: (out channels, )
-# For ordinary 1D convolution, simply set batch=1.
-signal = torch.randn(1,1,100)
-kernel = torch.tensor([1.0, -2.0, 1.0]).unsqueeze(0).unsqueeze(0)
+# # Create dummy data.  
+# #     Data shape: (batch, channels, length)
+# #     Kernel shape: (out_channels, in_channels, kernel_size)
+# #     Bias shape: (out channels, )
+# # For ordinary 1D convolution, simply set batch=1.
+# signal = torch.randn(1,1,100)
+# kernel = torch.tensor([1.0, -2.0, 1.0]).unsqueeze(0).unsqueeze(0)
 
-# Functional execution.  (Easiest for generic use cases.)
-convfft = fft_conv(signal, kernel, padding=1)
-convdirect = F.conv1d(signal, kernel, padding=1)
+# # Functional execution.  (Easiest for generic use cases.)
+# convfft = fft_conv(signal, kernel, padding=1)
+# convdirect = F.conv1d(signal, kernel, padding=1)
 
-plt.figure()
-plt.plot(convfft[0,0], label='spectral')
-plt.plot(convdirect[0,0], label='direct')
-plt.legend()
+# plt.figure()
+# plt.plot(convfft[0,0], label='spectral')
+# plt.plot(convdirect[0,0], label='direct')
+# plt.legend()
 
 
 # %%

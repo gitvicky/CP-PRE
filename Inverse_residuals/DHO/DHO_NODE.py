@@ -383,11 +383,10 @@ def analyze_residuals(t, neural_sol, m, c, k):
     residuals = D_damped(x)
     
     # Retrieve position through integration
-    pos_res = D_damped.differentiate(x, correlation=False, slice_pad=False)
+    pos_res = D_damped.differentiate(x, correlation=True, slice_pad=False)
     pos_retrieved = D_damped.integrate(pos_res, correlation=False, slice_pad=False)
     
-    print(x.shape, residuals.shape, pos_res.shape, pos_retrieved.shape)
-    return residuals, pos_retrieved
+    return residuals, pos_res, pos_retrieved
 
 
 # Main execution
@@ -431,7 +430,7 @@ if __name__ == "__main__":
         plot_phase_space(numerical_sol, neural_sol, oscillator.damping_type)
         
         # Analyze residuals
-        residuals, pos_retrieved = analyze_residuals(t, neural_sol, m, c, k)
+        residuals, pos_res, pos_retrieved = analyze_residuals(t, neural_sol, m, c, k)
         
         # Plot residuals
         plt.figure(figsize=(10, 6))
@@ -466,3 +465,41 @@ if __name__ == "__main__":
         print(f"Completed analysis for {name}")
 
 # %% 
+#further analysis 
+dt = t[1] - t[0]
+# Extract position and velocity
+x = torch.tensor(neural_sol[:, 0], dtype=torch.float32).unsqueeze(0)
+v = torch.tensor(neural_sol[:, 1], dtype=torch.float32).unsqueeze(0)
+
+# Initialize operators
+D_t = ConvOperator(order=1)
+D_tt = ConvOperator(order=2)
+D_identity = ConvOperator(order=0)
+D_identity.kernel = torch.tensor([0, 1, 0])
+
+# Create damped operator: m*D_tt + c*D_t + k*identity
+D_damped = ConvOperator(conv='spectral')
+D_damped.kernel = 2*m*D_tt.kernel + dt*c*D_t.kernel + 2*dt**2*k*D_identity.kernel
+
+# Calculate residuals
+residuals = D_damped(x)
+
+# Retrieve position through integration
+pos_res = D_damped.differentiate(x, correlation=True, slice_pad=False)
+pos_retrieved = D_damped.integrate(pos_res, correlation=True, slice_pad=False)
+
+# %%
+
+#Position Residual 
+plt.figure()
+plt.plot(t[1:-1], D_damped(x)[0,1:-1], 'b-', label='direct_residual')
+plt.plot(t[1:-1], D_damped(x)[0,1:-1], 'r--', label='spectral_residual')
+plt.plot(t[1:-1], D_damped.differentiate(x, correlation=True)[0, 1:-1], 'k:', label='custom_spectral')
+
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Position Residual')
+plt.legend()
+plt.grid(True)
+
+# %%

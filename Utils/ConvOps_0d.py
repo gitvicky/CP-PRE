@@ -108,6 +108,8 @@ class ConvOperator():
     def spectral_convolution(self, field, kernel=None):
         """
         Performs spectral convolution using the convolution theorem.
+        
+        f * g = \hat{f} . \hat{g}
 
         Args:
             field (torch.Tensor): Input tensor of shape (BS, Nt)
@@ -128,17 +130,16 @@ class ConvOperator():
         return convfft
 
 
-    def differentiate(self, field, kernel=None, eps=1e-6, correlation=False, slice_pad=True):
+    def differentiate(self, field, kernel=None, correlation=False, slice_pad=True):
         """
-        Performs integration using the convolution theorem.
+        Performs custom differentiation using the convolution theorem.
         
         Args:
-            field (torch.Tensor): Input tensor of shape (BS, Nt)
+            field (torch.Tensor): Input tensor of shape (BS, Nt, Nx)
             kernel (torch.Tensor, optional): Optional custom kernel
-            eps (float): Small value to avoid division by zero
 
         Returns:
-            torch.Tensor: Result of the integration operation
+            torch.Tensor: Result of the differentiation operation
         """
         if kernel is not None:
             self.kernel = kernel
@@ -160,6 +161,7 @@ class ConvOperator():
         padded_kernel = F.pad(kernel, kernel_padding)
 
         kernel_fft = torch.fft.rfftn(padded_kernel.float(), dim = tuple(range(2, field.ndim)))
+        
         if correlation==True:
             kernel_fft.imag *= -1
 
