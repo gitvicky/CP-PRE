@@ -16,7 +16,7 @@ function compute_inverse(kernel_fft, eps=1e-16)
     return 1 ./ (kernel_fft .+ eps)
 end
 
-include("intervalFFT.jl")
+include("../julia_files/intervalFFT.jl")
 
 numerical_sol = npzread("ODE_outputs_poor.npy")
 neural_sol = npzread("Nueral_outputs_poor.npy")
