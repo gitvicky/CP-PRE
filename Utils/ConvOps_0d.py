@@ -32,16 +32,17 @@ def get_stencil(deriv_order, taylor_order=2):
 
     if deriv_order == 0:  # Identity convolution
         return torch.tensor([0., 1., 0.], dtype=torch.float32)
-    elif deriv_order == 2 and taylor_order == 2:
-        return torch.tensor([1., -2., 1.], dtype=torch.float32)
     elif deriv_order == 1 and taylor_order == 2:
         return torch.tensor([-1., 0., 1.], dtype=torch.float32)
+    elif deriv_order == 1 and taylor_order == 4:
+        return torch.tensor([1/12, -2/3, 0, 2/3, -1/12], dtype=torch.float32)
+    elif deriv_order == 2 and taylor_order == 2:
+        return torch.tensor([1., -2., 1.], dtype=torch.float32)
     elif deriv_order == 2 and taylor_order == 4:
         return torch.tensor([-1/12, 4/3, -5/2, 4/3, -1/12], dtype=torch.float32)
     elif deriv_order == 2 and taylor_order == 6:
         return torch.tensor([1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90], dtype=torch.float32)
-    elif deriv_order == 1 and taylor_order == 4:
-        return torch.tensor([1/12, -2/3, 0, 2/3, -1/12], dtype=torch.float32)
+
     
     raise ValueError("Invalid stencil parameters")
 
