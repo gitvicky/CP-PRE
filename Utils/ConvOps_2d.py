@@ -12,6 +12,7 @@ import numpy as np
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F
+from fft_conv_pytorch.fft_conv import * 
 
 def get_stencil(dims, deriv_order, taylor_order=2):
     if dims == 1:
@@ -82,7 +83,6 @@ def pad_kernel(grid, kernel):#Could go into the deriv conv class
     bs, nt, nx, ny = grid.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]
     return torch.nn.functional.pad(kernel, (0, nx - kernel_size, 0, ny-kernel_size, 0, nt-kernel_size), "constant", 0)
 
-
 class ConvOperator():
     """
     A class for performing convolutions as a derivative or integrative operation on a given domain.
@@ -93,7 +93,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='conv', device='cpu', requires_grad=False):
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='direct', device='cpu', requires_grad=False):
 
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
@@ -125,7 +125,7 @@ class ConvOperator():
             pass
 
 
-        if conv == 'conv': 
+        if conv == 'direct': 
             self.conv = self.convolution
         elif conv == 'spectral':
             self.conv = self.spectral_convolution
@@ -146,10 +146,11 @@ class ConvOperator():
         if kernel != None: 
             self.kernel = kernel
 
-        return F.conv3d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2, self.kernel.shape[2]//2)).squeeze()
+        conv = F.conv3d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2, self.kernel.shape[2]//2))
+        return conv.squeeze(1)
     
 
-    def spectral_convolution(self, field, kernel=None):
+    def spectral_convolution(self, field, kernel=None, inverse=False):
         """
         Performs spectral convolution using the convolution theorem 
 
@@ -162,18 +163,72 @@ class ConvOperator():
         Returns:
             torch.Tensor: The result of the 3D derivative convolution.
         """ 
-        if kernel != None: 
+        if kernel is not None:
             self.kernel = kernel
 
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
-        kernel_pad = pad_kernel(field, self.kernel)
-        kernel_fft = torch.fft.fftn(kernel_pad)
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
+        # Add channel dimension for conv1d
+        if field.dim() == 4:
+            field = field.unsqueeze(1)
 
-        return torch.fft.ifftn(field_fft * kernel_fft, dim=(1,2,3)).real
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+        convfft = fft_conv(field, kernel, padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2, self.kernel.shape[2]//2), inverse=inverse)
+
+        return convfft.squeeze(1)
 
 
-    def diff_integrate(self, field, kernel=None, eps=1e-6):
+    def differentiate(self, field, kernel=None, correlation=False, slice_pad=False):
+
+        """
+        Performs Convolution using the convolution theorem. Manual Implementation. 
+        
+        f * g = \hat{f} . \hat{g}
+        
+        Args:
+            field (torch.Tensor): The input field tensor.
+            kernel (torch.Tensor): The convolution kernel tensor.
+        Returns:
+            torch.Tensor: The result of the 3D differentation operation. 
+        """
+        if kernel is not None:
+                self.kernel = kernel
+
+        # Add channel dimension for conv1d
+        if field.dim() == 4:
+            field = field.unsqueeze(1)
+
+        pad_size = self.kernel.size(-1) // 2
+        padded_field = F.pad(field, (pad_size,pad_size,pad_size,pad_size,pad_size,pad_size), mode='constant')
+
+        field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+
+        kernel_padding = [
+            pad
+            for i in reversed(range(2, padded_field.ndim))
+            for pad in [0, padded_field.size(i) - kernel.size(i)]
+        ]
+        padded_kernel = F.pad(kernel, kernel_padding)
+
+        kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
+
+        if correlation == True:
+            kernel_fft.imag *= -1 
+
+        output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim)))
+
+            # Remove extra padded values
+        if slice_pad == True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+
+            output = output[crop_slices].contiguous()
+
+        return output.squeeze(1)
+
+
+    def integrate(self, field, kernel=None, correlation=False, slice_pad=False, eps=1e-6):
 
         """
         Performs Integration using the convolution theorem 3D derivative convolution.
@@ -188,40 +243,46 @@ class ConvOperator():
             torch.Tensor: The result of the 3D Integration Operation. 
         """
         
-        if kernel != None: 
-            self.kernel = kernel
-        
-        kernel_pad = pad_kernel(field, self.kernel)
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
-        kernel_fft = torch.fft.fftn(kernel_pad)
-        inv_kernel_fft = 1 / (kernel_fft + eps)
-        u_integrate = torch.fft.ifftn(field_fft * kernel_fft * inv_kernel_fft, dim=(1,2,3)).real
-        return u_integrate
+        if kernel is not None:
+                self.kernel = kernel
 
-    def integrate(self, field, kernel=None, eps=1e-6):
+        # Add channel dimension for conv1d
+        if field.dim() == 4:
+            field = field.unsqueeze(1)
 
-        """
-        Performs Integration using the convolution theorem 3D derivative convolution.
-        
-        f * g * h = f  ; h =  1 / (g+eps)
-        
-        Args:
-            field (torch.Tensor): The input field tensor.
-            kernel (torch.Tensor): The convolution kernel tensor.
-            eps (float): Avoiding NaNs
-        Returns:
-            torch.Tensor: The result of the 3D Integration Operation. 
-        """
-        
-        if kernel != None: 
-            self.kernel = kernel
-        
-        kernel_pad = pad_kernel(field, self.kernel)
-        field_fft = torch.fft.fftn(field, dim=(1,2,3))#t,x,y
-        kernel_fft = torch.fft.fftn(kernel_pad)
+        pad_size = self.kernel.size(-1) // 2
+        padded_field = F.pad(field, (pad_size,pad_size,pad_size,pad_size,pad_size,pad_size), mode='constant')
+
+        field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
+        kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+
+        kernel_padding = [
+            pad
+            for i in reversed(range(2, padded_field.ndim))
+            for pad in [0, padded_field.size(i) - kernel.size(i)]
+        ]
+        padded_kernel = F.pad(kernel, kernel_padding)
+
+        kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
         inv_kernel_fft = 1 / (kernel_fft + eps)
-        u_integrate = torch.fft.ifftn(field_fft * inv_kernel_fft, dim=(1,2,3)).real
-        return u_integrate
+
+        if correlation == True:
+            inv_kernel_fft.imag *= -1 
+
+        output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim)))
+
+            # Remove extra padded values
+        if slice_pad == True:
+            crop_slices = [slice(None), slice(None)] + [
+                slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
+                for i in range(2, padded_field.ndim)
+            ]
+
+
+            output = output[crop_slices].contiguous()
+
+        return output.squeeze(1)
+
 
 
     def forward(self, field):
@@ -251,3 +312,37 @@ class ConvOperator():
         outputs = self.forward(inputs)
         return outputs
 
+# %% 
+# #Example Usage
+
+# import torch
+# from matplotlib import pyplot as plt
+
+# # One-liner 2D Gaussian function
+# x, y = torch.meshgrid(torch.linspace(-5, 5, 100), torch.linspace(-5, 5, 100), indexing='ij')
+# amplitude = torch.tensor(1.0, dtype=torch.float32)
+# x_mean = torch.tensor(0.0, dtype=torch.float32)
+# y_mean = torch.tensor(0.0, dtype=torch.float32)
+# x_sigma = torch.tensor(1.0, dtype=torch.float32)
+# y_sigma = torch.tensor(1.0, dtype=torch.float32)
+# theta = torch.tensor(0.0, dtype=torch.float32)
+
+# gaussian_2d = lambda x, y: amplitude * torch.exp(-0.5 * (((x - x_mean) * torch.cos(theta) - (y - y_mean) * torch.sin(theta))**2 / x_sigma**2 + ((x - x_mean) * torch.sin(theta) + (y - y_mean) * torch.cos(theta))**2 / y_sigma**2))
+# signal = gaussian_2d(x, y).unsqueeze(0).unsqueeze(0)
+# signal = torch.cat((signal, signal, signal), dim=1)
+
+
+# D = ConvOperator(domain=('x','y'), order=2)
+# direct_conv= D(signal)
+# spectral_conv = D.spectral_convolution(signal)
+# manual_conv = D.differentiate(signal, correlation=True, slice_pad=True)
+
+# # %% 
+# #Inverse 
+# diff = D.differentiate(signal, correlation=True, slice_pad=True)
+# integ = D.integrate(diff, correlation=False, slice_pad=True)
+
+# plt.imshow(integ[0, 1] - signal[0, 1])
+# plt.colorbar()
+
+# # %%

@@ -121,7 +121,6 @@ def fft_conv(
         for i in range(2, signal.ndim)
     ]
 
-    print(signal_size, kernel.size())
     output = output[crop_slices].contiguous()
 
     # Optionally, add a bias term before returning.
