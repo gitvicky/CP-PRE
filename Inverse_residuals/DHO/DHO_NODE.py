@@ -525,14 +525,14 @@ plt.legend()
 plt.grid(True)
 # %%
 
-# plt.figure()
-# plt.plot(t[1:-1], D_t(x)[0, 1:-1], 'k:', label='x_deriv')
-# plt.plot(t[1:-1], dt*2*v[0, 1:-1], 'r--', label='velocity')
-# plt.xlabel('Time')
-# plt.ylabel('Residual')
-# plt.title('Extracting velocity from x')
-# plt.legend()
-# plt.grid(True)
+plt.figure()
+plt.plot(t[1:-1], D_t(x)[0, 1:-1], 'k:', label='x_deriv')
+plt.plot(t[1:-1], D_t(x) - dt*2*v[0, 1:-1], 'r--', label='velocity')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Extracting velocity from x')
+plt.legend()
+plt.grid(True)
 # %%
 #Velocity 
 inverse_r1 =  D_R1.integrate(D_R1.differentiate(v, correlation=True, slice_pad=False), correlation=True, slice_pad=True)
@@ -547,6 +547,45 @@ plt.grid(True)
 
 #Position
 inverse_r2 =  D_R2.integrate(D_R2.differentiate(x, correlation=True, slice_pad=False), correlation=True, slice_pad=True)
+plt.figure()
+plt.plot(t[1:-1], x[0, 1:-1], 'k:', label='position')
+plt.plot(t[1:-1], inverse_r2[0, 2:-2], 'r--', label='split inverse')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Split Inverse - position')
+plt.legend()
+plt.grid(True)
+# %%
+
+D_R3 = ConvOperator()#x
+D_R3.kernel = D_t.kernel 
+
+D_R4 = ConvOperator()#v
+D_R4.kernel =  2*dt*D_identity.kernel
+
+residuals_r3r4 = - D_R4.differentiate(v, correlation=True) + D_R3.differentiate(x, correlation=True)
+
+plt.figure()
+plt.plot(t[1:-1], residuals_r3r4[0, 1:-1], 'r--', label='split residuals')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Split Residual - velocity')
+plt.legend()
+plt.grid(True)
+# %%
+#Velocity 
+inverse_r1 =  D_R4.integrate(D_R4.differentiate(v, correlation=True, slice_pad=False), correlation=True, slice_pad=True)
+plt.figure()
+plt.plot(t[1:-1], v[0, 1:-1], 'k:', label='velocity')
+plt.plot(t[1:-1], inverse_r1[0, 2:-2], 'r--', label='split inverse')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Split Inverse - velocity ')
+plt.legend()
+plt.grid(True)
+
+#Position
+inverse_r2 =  D_R4.integrate(D_R4.differentiate(x, correlation=True, slice_pad=False), correlation=True, slice_pad=True)
 plt.figure()
 plt.plot(t[1:-1], x[0, 1:-1], 'k:', label='position')
 plt.plot(t[1:-1], inverse_r2[0, 2:-2], 'r--', label='split inverse')
