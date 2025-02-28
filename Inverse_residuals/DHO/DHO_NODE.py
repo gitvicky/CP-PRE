@@ -506,7 +506,6 @@ plt.grid(True)
 x = torch.tensor(neural_sol[:, 0], dtype=torch.float32).unsqueeze(0)
 v = torch.tensor(neural_sol[:, 1], dtype=torch.float32).unsqueeze(0)
 
-
 D_R1 = ConvOperator()#v
 D_R1.kernel = m*D_t.kernel + 2*dt*c*D_identity.kernel
 
@@ -527,7 +526,7 @@ plt.grid(True)
 
 plt.figure()
 plt.plot(t[1:-1], D_t(x)[0, 1:-1], 'k:', label='x_deriv')
-plt.plot(t[1:-1], D_t(x) - dt*2*v[0, 1:-1], 'r--', label='velocity')
+plt.plot(t[1:-1], dt*2*v[0, 1:-1], 'r--', label='velocity')
 plt.xlabel('Time')
 plt.ylabel('Residual')
 plt.title('Extracting velocity from x')
