@@ -176,7 +176,7 @@ class ConvOperator():
         return convfft.squeeze(1)
 
 
-    def differentiate(self, field, kernel=None, correlation=False, slice_pad=False):
+    def differentiate(self, field, kernel=None, correlation=False, slice_pad=True):
 
         """
         Performs Convolution using the convolution theorem. Manual Implementation. 
@@ -190,7 +190,7 @@ class ConvOperator():
             torch.Tensor: The result of the 3D differentation operation. 
         """
         if kernel is not None:
-                self.kernel = kernel
+            self.kernel = kernel
 
         # Add channel dimension for conv1d
         if field.dim() == 4:
@@ -199,7 +199,7 @@ class ConvOperator():
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size,pad_size,pad_size,pad_size,pad_size,pad_size), mode='constant')
 
-        field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
+        field_fft = torch.fft.rfftn(padded_field.float(), dim=tuple(range(2, field.ndim)))
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
 
         kernel_padding = [
@@ -209,10 +209,10 @@ class ConvOperator():
         ]
         padded_kernel = F.pad(kernel, kernel_padding)
 
-        kernel_fft = torch.fft.rfftn(padded_kernel, dim = tuple(range(2, field.ndim)))
+        kernel_fft = torch.fft.rfftn(padded_kernel.float(), dim = tuple(range(2, field.ndim)))
 
         if correlation == True:
-            kernel_fft.imag *= -1 
+            kernel_fft.imag *= -1
 
         output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim)))
 
@@ -313,36 +313,36 @@ class ConvOperator():
         return outputs
 
 # %% 
-# #Example Usage
+#Example Usage
 
-# import torch
-# from matplotlib import pyplot as plt
+import torch
+from matplotlib import pyplot as plt
 
-# # One-liner 2D Gaussian function
-# x, y = torch.meshgrid(torch.linspace(-5, 5, 100), torch.linspace(-5, 5, 100), indexing='ij')
-# amplitude = torch.tensor(1.0, dtype=torch.float32)
-# x_mean = torch.tensor(0.0, dtype=torch.float32)
-# y_mean = torch.tensor(0.0, dtype=torch.float32)
-# x_sigma = torch.tensor(1.0, dtype=torch.float32)
-# y_sigma = torch.tensor(1.0, dtype=torch.float32)
-# theta = torch.tensor(0.0, dtype=torch.float32)
+# One-liner 2D Gaussian function
+x, y = torch.meshgrid(torch.linspace(-5, 5, 100), torch.linspace(-5, 5, 100), indexing='ij')
+amplitude = torch.tensor(1.0, dtype=torch.float32)
+x_mean = torch.tensor(0.0, dtype=torch.float32)
+y_mean = torch.tensor(0.0, dtype=torch.float32)
+x_sigma = torch.tensor(1.0, dtype=torch.float32)
+y_sigma = torch.tensor(1.0, dtype=torch.float32)
+theta = torch.tensor(0.0, dtype=torch.float32)
 
-# gaussian_2d = lambda x, y: amplitude * torch.exp(-0.5 * (((x - x_mean) * torch.cos(theta) - (y - y_mean) * torch.sin(theta))**2 / x_sigma**2 + ((x - x_mean) * torch.sin(theta) + (y - y_mean) * torch.cos(theta))**2 / y_sigma**2))
-# signal = gaussian_2d(x, y).unsqueeze(0).unsqueeze(0)
-# signal = torch.cat((signal, signal, signal), dim=1)
+gaussian_2d = lambda x, y: amplitude * torch.exp(-0.5 * (((x - x_mean) * torch.cos(theta) - (y - y_mean) * torch.sin(theta))**2 / x_sigma**2 + ((x - x_mean) * torch.sin(theta) + (y - y_mean) * torch.cos(theta))**2 / y_sigma**2))
+signal = gaussian_2d(x, y).unsqueeze(0).unsqueeze(0)
+signal = torch.cat((signal, signal, signal), dim=1)
 
 
-# D = ConvOperator(domain=('x','y'), order=2)
-# direct_conv= D(signal)
-# spectral_conv = D.spectral_convolution(signal)
-# manual_conv = D.differentiate(signal, correlation=True, slice_pad=True)
+D = ConvOperator(domain=('x','y'), order=2)
+direct_conv= D(signal)
+spectral_conv = D.spectral_convolution(signal)
+manual_conv = D.differentiate(signal, correlation=True, slice_pad=True)
 
-# # %% 
-# #Inverse 
-# diff = D.differentiate(signal, correlation=True, slice_pad=True)
-# integ = D.integrate(diff, correlation=False, slice_pad=True)
+# %% 
+#Inverse 
+diff = D.differentiate(signal, correlation=True, slice_pad=True)
+integ = D.integrate(diff, correlation=False, slice_pad=True)
 
-# plt.imshow(integ[0, 1] - signal[0, 1])
-# plt.colorbar()
+plt.imshow(integ[0, 1] - signal[0, 1])
+plt.colorbar()
 
-# # %%
+# %%

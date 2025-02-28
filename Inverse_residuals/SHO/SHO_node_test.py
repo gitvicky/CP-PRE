@@ -440,3 +440,12 @@ plt.grid(True)
 
 
 # %%
+plt.figure()
+plt.plot(t[1:-1], D_t.differentiate(x, correlation=True)[0, 1:-1], 'k:', label='x_deriv')
+plt.plot(t[1:-1], dt*2*v[0, 1:-1], 'r--', label='velocity')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.title('Extracting velocity from x')
+plt.legend()
+plt.grid(True)
+# %%

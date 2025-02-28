@@ -181,6 +181,7 @@ class ConvOperator():
 
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size, pad_size, pad_size, pad_size), mode='constant')
+        
         field_fft = torch.fft.rfftn(padded_field.float(), dim=tuple(range(2, field.ndim)))
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
 
@@ -193,14 +194,13 @@ class ConvOperator():
 
         kernel_fft = torch.fft.rfftn(padded_kernel.float(), dim = tuple(range(2, field.ndim)))
         
-        if correlation==True:
+        if correlation == True:
             kernel_fft.imag *= -1
 
         output = irfftn(field_fft * kernel_fft, dim=tuple(range(2, field.ndim)))
-        print(output.shape)
-
+        
         # Remove extra padded values
-        if slice_pad==True:
+        if slice_pad == True:
             crop_slices = [slice(None), slice(None)] + [
                 slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
                 for i in range(2, padded_field.ndim)
@@ -232,11 +232,12 @@ class ConvOperator():
             field = field.unsqueeze(1)
 
         pad_size = self.kernel.size(-1) // 2
-        padded_field = F.pad(field, (pad_size,pad_size), mode='constant')
+        padded_field = F.pad(field, (pad_size, pad_size, pad_size, pad_size), mode='constant')
         # padded_field = field
 
         field_fft = torch.fft.rfftn(padded_field, dim=tuple(range(2, field.ndim)))
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
+        
 
         kernel_padding = [
             pad
@@ -256,16 +257,9 @@ class ConvOperator():
         output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim)))
 
             # Remove extra padded values
-        if slice_pad == True and correlation==True:
+        if slice_pad == True:
             crop_slices = [slice(None), slice(None)] + [
                 slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
-                for i in range(2, padded_field.ndim)
-            ]
-
-            # Remove extra padded values
-        if slice_pad == True and correlation==False:
-            crop_slices = [slice(None), slice(None)] + [
-                slice(-(padded_field.size(i) - kernel.size(i) + 1),  -1, 1)#stride=1
                 for i in range(2, padded_field.ndim)
             ]
 
@@ -299,54 +293,57 @@ class ConvOperator():
         """
         return self.forward(inputs)
 
-# # %% 
-# #Example Usage
-# import torch 
-# from matplotlib import pyplot as plt 
+# %% 
+#Example Usage
+import torch 
+from matplotlib import pyplot as plt 
 
-# def convection_solution(initial_condition, c, dt, nt):
-#     """
-#     Implementation of convection equation with analytical solution u(x,t) = f(x - ct)
+def convection_solution(initial_condition, c, dt, nt):
+    """
+    Implementation of convection equation with analytical solution u(x,t) = f(x - ct)
     
-#     Args:
-#         initial_condition: Tensor of shape [1, 1, Nx] containing the initial condition
-#         c: Convection velocity (scalar)
-#         dt: Time step
-#         nt: Number of time steps
+    Args:
+        initial_condition: Tensor of shape [1, 1, Nx] containing the initial condition
+        c: Convection velocity (scalar)
+        dt: Time step
+        nt: Number of time steps
     
-#     Returns:
-#         Tensor of shape [1, Nt, Nx] containing the solution
-#     """
-#     return torch.cat([initial_condition(torch.arange(initial_condition.shape[2]).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
+    Returns:
+        Tensor of shape [1, Nt, Nx] containing the solution
+    """
+    return torch.cat([initial_condition(torch.arange(initial_condition.shape[2]).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
 
 
-# # Define parameters
-# nx = 100
-# nt = 50
-# c = 1.0
-# dt = 0.1
-# x = np.linspace(0, 1 ,nx)
-# dx = x[1]-x[0]
+# Define parameters
+nx = 100
+nt = 50
+c = 1.0
+dt = 0.1
+x = np.linspace(0, 1 ,nx)
+dx = x[1]-x[0]
 
-# # Initial condition function (Gaussian)
-# def initial_condition(x):
-#     return torch.exp(-(x - nx/2)**2 / 50).reshape(1, 1, -1)
+# Initial condition function (Gaussian)
+def initial_condition(x):
+    return torch.exp(-(x - nx/2)**2 / 50).reshape(1, 1, -1)
 
-# # One-liner solution
-# solution = torch.cat([initial_condition(torch.arange(nx).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
+# One-liner solution
+solution = torch.cat([initial_condition(torch.arange(nx).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
 # plt.plot(solution[0].T)
 
 
-# # %%
+# %%
 
-# D_t = ConvOperator(domain='t', order=1)
-# D_x = ConvOperator(domain='x', order=1)
-# D = ConvOperator()
-# D.kernel = D_t.kernel + dt/dx*c*D_x.kernel
+D_t = ConvOperator(domain='t', order=1)
+D_x = ConvOperator(domain='x', order=1)
+D = ConvOperator()
+D.kernel = D_t.kernel + dt/dx*c*D_x.kernel
 
-# direct_res = D(solution) #direct convolution
-# spectral_res = D.spectral_convolution(solution) #spectral convolution
-# manual_res = D.differentiate(solution) #Manual
+direct_res = D(solution) #direct convolution
+spectral_res = D.spectral_convolution(solution) #spectral convolution
+manual_res = D.differentiate(solution, correlation=True, slice_pad=True) #Manual
 
-
+# %%
+#Inverse 
+diff = D.differentiate(solution, correlation=False, slice_pad=False)
+integ = D.integrate(diff, correlation=True, slice_pad=True)
 # %%
