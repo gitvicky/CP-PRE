@@ -1,0 +1,609 @@
+'''
+Cauchy-Euler Equation:
+
+Eqn:
+     x²(d²y/dx²) + ax(dy/dx) + by = 0
+
+First order system:
+    dy/dx = z
+    dz/dx = -(a/x)z - (b/x²)y
+
+Note: We'll handle the singularity at x=0 by defining our domain on a positive interval.
+'''
+
+# %% 
+import numpy as np
+import torch
+import torch.nn as nn
+from torchdiffeq import odeint
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+from scipy.integrate import solve_ivp
+
+# Import your ConvOps module
+import sys
+sys.path.append("/Users/Vicky/Documents/UKAEA/Code/Uncertainty_Quantification/PDE_Residuals")
+from Utils.ConvOps_0d import ConvOperator
+
+
+class CauchyEulerEquation:
+    """Numerical Cauchy-Euler equation implementation."""
+    
+    def __init__(self, a=1.0, b=1.0):
+        """
+        Initialize the Cauchy-Euler equation solver.
+        
+        Args:
+            a (float): Coefficient of x(dy/dx)
+            b (float): Coefficient of y
+        """
+        self.a = a
+        self.b = b
+        
+        # Determine the nature of solutions based on the discriminant
+        self.discriminant = a**2 - 4*b
+        
+        if self.discriminant > 0:
+            self.solution_type = "Distinct real roots"
+            self.r1 = (-a + np.sqrt(self.discriminant)) / 2
+            self.r2 = (-a - np.sqrt(self.discriminant)) / 2
+        elif self.discriminant == 0:
+            self.solution_type = "Repeated real root"
+            self.r = -a / 2
+        else:
+            self.solution_type = "Complex conjugate roots"
+            self.alpha = -a / 2
+            self.beta = np.sqrt(-self.discriminant) / 2
+            
+    def get_state_derivative(self, x, state):
+        """
+        Compute the derivative of the state vector [y, z] where z = dy/dx.
+        
+        Args:
+            x (float): Independent variable
+            state (np.ndarray): State vector [y, z]
+            
+        Returns:
+            np.ndarray: Derivative of state vector [dy/dx, dz/dx]
+        """
+        y, z = state
+        
+        # Handle possible division by zero
+        if abs(x) < 1e-10:
+            x = 1e-10 * (1 if x >= 0 else -1)
+        
+        dy_dx = z
+        dz_dx = -(self.a/x) * z - (self.b/(x**2)) * y
+        
+        return np.array([dy_dx, dz_dx])
+    
+    def solve_ode(self, x_span, initial_state, x_eval=None):
+        """
+        Solve the ODE numerically using scipy.integrate.solve_ivp
+        
+        Args:
+            x_span (tuple): Variable span (x_start, x_end)
+            initial_state (np.ndarray): Initial state [y0, z0]
+            x_eval (np.ndarray, optional): Points at which to evaluate solution
+            
+        Returns:
+            tuple: x points and solution array
+        """
+        solution = solve_ivp(
+            fun=self.get_state_derivative,
+            t_span=x_span,
+            y0=initial_state,
+            t_eval=x_eval,
+            method='RK45',
+            rtol=1e-8,
+            atol=1e-8
+        )
+        return solution.t, solution.y.T
+    
+    def analytical_solution(self, x, C1=1.0, C2=1.0):
+        """
+        Compute the analytical solution for verification.
+        
+        Args:
+            x (np.ndarray): Points at which to evaluate the solution
+            C1, C2 (float): Constants determined by initial conditions
+            
+        Returns:
+            np.ndarray: Analytical solution
+        """
+        if self.discriminant > 0:
+            return C1 * x**self.r1 + C2 * x**self.r2
+        elif self.discriminant == 0:
+            return C1 * x**self.r + C2 * x**self.r * np.log(x)
+        else:
+            return x**self.alpha * (C1 * np.cos(self.beta * np.log(x)) + 
+                                     C2 * np.sin(self.beta * np.log(x)))
+
+
+# Neural network for the Neural ODE
+class ODEFunc(nn.Module):
+    """Neural network representing the ODE function."""
+    
+    def __init__(self, hidden_dim):
+        """
+        Initialize the neural ODE function.
+        
+        Args:
+            hidden_dim (int): Number of hidden units
+        """
+        super(ODEFunc, self).__init__()
+        # Input: [x, y, z] - we include x explicitly since the equation depends on it
+        self.net = nn.Sequential(
+            nn.Linear(3, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 2)
+        )
+        
+    def forward(self, x, y):
+        """
+        Forward pass of the neural network.
+        
+        Args:
+            x (torch.Tensor): Independent variable point
+            y (torch.Tensor): State vector [y, z]
+            
+        Returns:
+            torch.Tensor: Predicted derivative
+        """
+        # Combine x with the state for input to the network
+        # Handle possible zero values in x
+        x_safe = torch.where(torch.abs(x) < 1e-10, 
+                             1e-10 * torch.sign(x + 1e-15), 
+                             x)
+        
+        inputs = torch.cat([x_safe.reshape(-1, 1), y], dim=1)
+        return self.net(inputs)
+
+
+def generate_training_data(equation, x_span, n_points, n_trajectories):
+    """
+    Generate training data using numerical integration.
+    
+    Args:
+        equation (CauchyEulerEquation): Equation instance
+        x_span (tuple): Variable span (x_start, x_end)
+        n_points (int): Number of points per trajectory
+        n_trajectories (int): Number of trajectories
+        
+    Returns:
+        tuple: x points, states, and derivatives arrays
+    """
+    x_eval = np.linspace(x_span[0], x_span[1], n_points)
+    x_values = []
+    states = []
+    derivatives = []
+    
+    for _ in range(n_trajectories):
+        # Random initial conditions
+        y0 = np.random.uniform(-2, 2)
+        z0 = np.random.uniform(-2, 2)
+        initial_state = np.array([y0, z0])
+        
+        # Get numerical solution
+        x, solution = equation.solve_ode(x_span, initial_state, x_eval)
+        
+        # Store x values and states
+        x_values.append(x)
+        states.append(solution)
+        
+        # Compute derivatives
+        derivs = np.array([equation.get_state_derivative(x_val, state) 
+                          for x_val, state in zip(x, solution)])
+        derivatives.append(derivs)
+    
+    return (np.stack(x_values, axis=0),
+            np.stack(states, axis=0),
+            np.stack(derivatives, axis=0))
+
+
+def train_neural_ode(func, train_x, train_states, train_derivs, n_epochs, batch_size):
+    """
+    Train the neural ODE.
+    
+    Args:
+        func (ODEFunc): Neural network instance
+        train_x (np.ndarray): x points
+        train_states (np.ndarray): State trajectories
+        train_derivs (np.ndarray): State derivatives
+        n_epochs (int): Number of training epochs
+        batch_size (int): Batch size
+        
+    Returns:
+        list: Training losses
+    """
+    optimizer = torch.optim.Adam(func.parameters())
+    losses = []
+    
+    # Convert to PyTorch tensors
+    train_x = torch.FloatTensor(train_x)
+    train_states = torch.FloatTensor(train_states)
+    train_derivs = torch.FloatTensor(train_derivs)
+    
+    n_samples, n_points, _ = train_states.shape
+    
+    for epoch in range(n_epochs):
+        epoch_loss = 0
+        
+        # Create batches of trajectories
+        indices = torch.randperm(n_samples)
+        
+        for i in range(0, n_samples, batch_size):
+            batch_indices = indices[i:i+batch_size]
+            batch_x = train_x[batch_indices].reshape(-1, 1)
+            batch_states = train_states[batch_indices].reshape(-1, 2)
+            batch_derivs = train_derivs[batch_indices].reshape(-1, 2)
+            
+            pred_derivs = func(batch_x, batch_states)
+            loss = torch.mean((pred_derivs - batch_derivs)**2)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            epoch_loss += loss.item()
+        
+        losses.append(epoch_loss)
+        if (epoch + 1) % 100 == 0:
+            print(f'Epoch {epoch+1}, Loss: {epoch_loss:.6f}')
+    
+    return losses
+
+
+class CauchyEulerNeuralODE(nn.Module):
+    """Neural ODE for Cauchy-Euler equation."""
+    
+    def __init__(self, ode_func):
+        """
+        Initialize the neural ODE.
+        
+        Args:
+            ode_func (ODEFunc): Neural network for the ODE function
+        """
+        super(CauchyEulerNeuralODE, self).__init__()
+        self.ode_func = ode_func
+        
+    def forward(self, x, y0):
+        """
+        Forward pass of the neural ODE.
+        
+        Args:
+            x (torch.Tensor): x points
+            y0 (torch.Tensor): Initial state
+            
+        Returns:
+            torch.Tensor: Solution at x points
+        """
+        # Define a wrapper to match the expected signature
+        def odefunc_wrapper(t, y):
+            return self.ode_func(t, y)
+        
+        # Solve the ODE
+        solution = odeint(odefunc_wrapper, y0, x)
+        return solution
+
+
+def compare_solutions(equation, neural_ode, x_span, initial_state, n_points=100):
+    """
+    Compare numerical and neural ODE solutions.
+    
+    Args:
+        equation (CauchyEulerEquation): Equation instance
+        neural_ode (ODEFunc): Trained neural network
+        x_span (tuple): Variable span (x_start, x_end)
+        initial_state (np.ndarray): Initial state [y0, z0]
+        n_points (int): Number of evaluation points
+        
+    Returns:
+        tuple: x points and solutions (numerical and neural)
+    """
+    x = torch.linspace(x_span[0], x_span[1], n_points)
+    
+    # Numerical solution
+    _, numerical_solution = equation.solve_ode(
+        x_span, initial_state, x.numpy())
+    
+    # Neural ODE solution
+    state_0 = torch.FloatTensor(initial_state).unsqueeze(0)
+    print(state_0.shape)
+    
+    def odefunc_wrapper(t, y):
+        return neural_ode(t, y)
+    
+    neural_solution = odeint(odefunc_wrapper, state_0, x)
+    
+    return (x.numpy(), 
+            numerical_solution,
+            neural_solution.detach().numpy())
+
+
+def evaluate(equation, neural_ode, x_span, y_range, z_range, n_solves, n_points=100):
+    """
+    Compare numerical and neural ODE solutions for multiple initial conditions.
+    
+    Args:
+        equation (CauchyEulerEquation): Equation instance
+        neural_ode (ODEFunc): Trained neural network
+        x_span (tuple): Variable span (x_start, x_end)
+        y_range (tuple): Range for initial y values
+        z_range (tuple): Range for initial z values
+        n_solves (int): Number of random initial conditions
+        n_points (int): Number of evaluation points
+        
+    Returns:
+        tuple: x points and solutions (numerical and neural)
+    """
+    x = torch.linspace(x_span[0], x_span[1], n_points)
+    
+    num_solns = []
+    neural_solns = []
+
+    for _ in tqdm(range(n_solves)):
+        
+        y0 = np.random.uniform(*y_range)
+        z0 = np.random.uniform(*z_range)
+        initial_state = np.array([y0, z0])
+
+        # Numerical solution
+        _, numerical_solution = equation.solve_ode(
+            x_span, initial_state, x.numpy())
+        
+        # Neural ODE solution
+        state_0 = torch.FloatTensor(initial_state)
+        
+        def odefunc_wrapper(t, y):
+            return neural_ode(t, y)
+        
+        neural_solution = odeint(odefunc_wrapper, state_0, x)
+
+        num_solns.append(numerical_solution)
+        neural_solns.append(neural_solution.detach().numpy())
+    
+    return (x.numpy(), 
+            np.asarray(num_solns),
+            np.asarray(neural_solns))
+
+
+def plot_comparison(x, numerical_sol, neural_sol, solution_type=""):
+    """
+    Plot comparison between numerical and neural ODE solutions.
+    
+    Args:
+        x (np.ndarray): x points
+        numerical_sol (np.ndarray): Numerical solution
+        neural_sol (np.ndarray): Neural ODE solution
+        solution_type (str): Type of solution for the title
+    """
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    
+    # Function value plot
+    ax1.plot(x, numerical_sol[:, 0], 'b-', label='Numerical')
+    ax1.plot(x, neural_sol[:, 0], 'r--', label='Neural ODE')
+    ax1.set_xlabel('x')
+    ax1.set_ylabel('y(x)')
+    ax1.legend()
+    ax1.grid(True)
+    if solution_type:
+        ax1.set_title(f'Solution y(x) ({solution_type})')
+    else:
+        ax1.set_title('Solution y(x)')
+    
+    # Derivative plot
+    ax2.plot(x, numerical_sol[:, 1], 'b-', label='Numerical')
+    ax2.plot(x, neural_sol[:, 1], 'r--', label='Neural ODE')
+    ax2.set_xlabel('x')
+    ax2.set_ylabel('y\'(x)')
+    ax2.legend()
+    ax2.grid(True)
+    if solution_type:
+        ax2.set_title(f'Derivative y\'(x) ({solution_type})')
+    else:
+        ax2.set_title('Derivative y\'(x)')
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_phase_space(numerical_sol, neural_sol, solution_type=""):
+    """
+    Plot phase space comparison between numerical and neural ODE solutions.
+    
+    Args:
+        numerical_sol (np.ndarray): Numerical solution
+        neural_sol (np.ndarray): Neural ODE solution
+        solution_type (str): Type of solution for the title
+    """
+    plt.figure(figsize=(8, 6))
+    plt.plot(numerical_sol[:, 0], numerical_sol[:, 1], 'b-', label='Numerical')
+    plt.plot(neural_sol[:, 0], neural_sol[:, 1], 'r--', label='Neural ODE')
+    plt.xlabel('y(x)')
+    plt.ylabel('y\'(x)')
+    if solution_type:
+        plt.title(f'Phase Space Trajectory ({solution_type})')
+    else:
+        plt.title('Phase Space Trajectory')
+    plt.legend()
+    plt.grid(True)
+    plt.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    plt.axvline(x=0, color='k', linestyle='-', alpha=0.3)
+    plt.show()
+
+
+def analyze_residuals(x, neural_sol, a, b):
+    """
+    Analyze residuals using convolutional operators.
+    
+    Args:
+        x (np.ndarray): x points
+        neural_sol (np.ndarray): Neural ODE solution
+        a (float): Coefficient of x(dy/dx)
+        b (float): Coefficient of y
+        
+    Returns:
+        tuple: Residuals and retrieved solution
+    """
+         x²(d²y/dx²) + ax(dy/dx) + by = 0
+
+    dx = x[1] - x[0]
+    
+    # Extract position and its derivative
+    y = torch.tensor(neural_sol[:, 0], dtype=torch.float32).unsqueeze(0)
+    
+    # Initialize operators
+    D_x = ConvOperator(order=1)
+    D_xx = ConvOperator(order=2)
+    D_identity = ConvOperator(order=0)
+    D_identity.kernel = torch.tensor([0, 1, 0])
+    
+    # Create Cauchy-Euler operator: x²*D_xx + a*x*D_x + b*identity
+    # We'll need to handle x and x² coefficients separately
+    
+    # First, compute the derivatives
+    dy_dx = D_x(y)
+    d2y_dx2 = D_xx(y)
+    
+    # Apply x and x² coefficients
+    x_tensor = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+    x2_d2y_dx2 = (x_tensor**2) * d2y_dx2
+    x_dy_dx = x_tensor * dy_dx
+    
+    # Compute residuals
+    residuals = x2_d2y_dx2 + a * x_dy_dx + b * y
+    
+    # For retrieval, we'll use a different approach since the equation
+    # has variable coefficients - we'll use a simplified version for demonstration
+    
+    # Create a simplified operator for retrieval (approximation)
+    D_simplified = ConvOperator(conv='spectral')
+    D_simplified.kernel = D_xx.kernel + a*dx*D_x.kernel/np.mean(x) + b*dx**2*D_identity.kernel/np.mean(x)**2
+    
+    # Calculate residuals with simplified operator
+    residuals_simplified = D_simplified(y)
+    
+    # Retrieve function through integration
+    y_res = D_simplified.differentiate(y, correlation=True, slice_pad=False)
+    y_retrieved = D_simplified.integrate(y_res, correlation=True, slice_pad=False)
+    
+    return residuals, residuals_simplified, y_res, y_retrieved
+
+# %% 
+
+# Equation parameters
+a, b = 1.0, 4.0  # Try different values to get different solution types
+
+print(f"\n=== Testing Cauchy-Euler Equation with a={a}, b={b} ===")
+equation = CauchyEulerEquation(a, b)
+print(f"Discriminant = {equation.discriminant:.3f}, Solution type: {equation.solution_type}")
+
+# Generate training data
+# Note: We avoid x=0 since the equation is singular there
+x_span = (0.1, 5.0)
+n_points = 100
+n_trajectories = 50
+x_values, states, derivs = generate_training_data(
+    equation, x_span, n_points, n_trajectories)
+
+# Initialize and train neural ODE
+func = ODEFunc(hidden_dim=64)
+losses = train_neural_ode(
+    func, x_values, states, derivs, n_epochs=5000, batch_size=16)
+
+# %% 
+# Compare solutions
+initial_state = np.array([1.0, 0.0])  # y(x0) = 1, y'(x0) = 0
+x, numerical_sol, neural_sol = compare_solutions(
+    equation, func, x_span, initial_state)
+
+# Plot results
+plot_comparison(x, numerical_sol, neural_sol[:,0], equation.solution_type)
+plot_phase_space(numerical_sol, neural_sol[:,0], equation.solution_type)
+
+
+# %% 
+# Analyze residuals
+residuals, residuals_simplified, y_res, y_retrieved = analyze_residuals(
+    x, neural_sol[:, 0], a, b)
+
+# Plot residuals
+plt.figure(figsize=(10, 6))
+plt.plot(x[1:-1], residuals[0, 1:-1], 'b-', label='Full Residual')
+plt.plot(x[1:-1], residuals_simplified[0, 1:-1], 'r--', label='Simplified Residual')
+plt.xlabel('x')
+plt.ylabel('Residual')
+plt.title(f'Residuals ({equation.solution_type})')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Plot retrieved vs actual solution
+plt.figure(figsize=(10, 6))
+plt.plot(x, neural_sol[:, 0], 'b-', label='Actual')
+plt.plot(x, y_retrieved[0, 1:-1], 'r--', label='Retrieved')
+plt.xlabel('x')
+plt.ylabel('y(x)')
+plt.title(f'Solution: Actual vs Retrieved ({equation.solution_type})')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Evaluate on multiple initial conditions
+print("\nEvaluating on multiple initial conditions...")
+x, num_solns, neural_solns = evaluate(
+    equation, func, x_span, y_range=(-2, 2), z_range=(-2, 2), n_solves=5)
+    
+# Save results
+np.save(f"CE_numerical_outputs_a{int(a*10)}_b{int(b*10)}", num_solns)
+np.save(f"CE_neural_outputs_a{int(a*10)}_b{int(b*10)}", neural_solns)
+
+print(f"Completed analysis for Cauchy-Euler equation")
+# %%
+        # x²(d²y/dx²) + ax(dy/dx) + by = 0
+
+dx = x[1] - x[0]
+
+# Extract position and its derivative
+y = torch.tensor(neural_sol[:, 0, 0], dtype=torch.float32).unsqueeze(0)
+
+# Initialize operators
+D_x = ConvOperator(order=1)
+D_xx = ConvOperator(order=2)
+D_identity = ConvOperator(order=0)
+D_identity.kernel = torch.tensor([0, 1, 0])
+
+# Create Cauchy-Euler operator: x²*D_xx + a*x*D_x + b*identity
+# We'll need to handle x and x² coefficients separately
+
+# First, compute the derivatives
+dy_dx = D_x(y)
+d2y_dx2 = D_xx(y)
+
+# Apply x and x² coefficients
+x_tensor = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+x2_d2y_dx2 = (x_tensor**2) * d2y_dx2
+x_dy_dx = x_tensor * dy_dx
+
+# Compute residuals
+residuals = x2_d2y_dx2*2 + a * x_dy_dx*dx + b * y*2*dx**2
+
+# For retrieval, we'll use a different approach since the equation
+# has variable coefficients - we'll use a simplified version for demonstration
+
+# Create a simplified operator for retrieval (approximation)
+D_simplified = ConvOperator(conv='spectral')
+D_simplified.kernel = D_xx.kernel + a*dx*D_x.kernel/np.mean(x) + b*dx**2*D_identity.kernel/np.mean(x)**2
+
+# Calculate residuals with simplified operator
+residuals_simplified = D_simplified(y)
+
+# Retrieve function through integration
+y_res = D_simplified.differentiate(y, correlation=True, slice_pad=False)
+y_retrieved = D_simplified.integrate(y_res, correlation=True, slice_pad=False)
+
+
+# %%

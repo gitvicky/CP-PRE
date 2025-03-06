@@ -3,11 +3,11 @@
 """
 2nd July, 2024
 
-Vector Operations implemented using the ConvOps Class 
+Vector Operations implemented using the ConvOps Class for 2D+time problems.
 Data used for all operations should be in the shape: BS, Nt, Nx, Ny
 """
 
-from Utils.ConvOps_spatial import *
+from Utils.ConvOps_2d import *
 
 #############################################  
 #Vector Operations 

@@ -293,36 +293,36 @@ class ConvOperator():
         return outputs
 
 # %% 
-#Example Usage
+# #Example Usage
 
-import torch
-from matplotlib import pyplot as plt
+# import torch
+# from matplotlib import pyplot as plt
 
-# One-liner 2D Gaussian function
-x, y = torch.meshgrid(torch.linspace(-5, 5, 100), torch.linspace(-5, 5, 100), indexing='ij')
-amplitude = torch.tensor(1.0, dtype=torch.float32)
-x_mean = torch.tensor(0.0, dtype=torch.float32)
-y_mean = torch.tensor(0.0, dtype=torch.float32)
-x_sigma = torch.tensor(1.0, dtype=torch.float32)
-y_sigma = torch.tensor(1.0, dtype=torch.float32)
-theta = torch.tensor(0.0, dtype=torch.float32)
+# # One-liner 2D Gaussian function
+# x, y = torch.meshgrid(torch.linspace(-5, 5, 100), torch.linspace(-5, 5, 100), indexing='ij')
+# amplitude = torch.tensor(1.0, dtype=torch.float32)
+# x_mean = torch.tensor(0.0, dtype=torch.float32)
+# y_mean = torch.tensor(0.0, dtype=torch.float32)
+# x_sigma = torch.tensor(1.0, dtype=torch.float32)
+# y_sigma = torch.tensor(1.0, dtype=torch.float32)
+# theta = torch.tensor(0.0, dtype=torch.float32)
 
-gaussian_2d = lambda x, y: amplitude * torch.exp(-0.5 * (((x - x_mean) * torch.cos(theta) - (y - y_mean) * torch.sin(theta))**2 / x_sigma**2 + ((x - x_mean) * torch.sin(theta) + (y - y_mean) * torch.cos(theta))**2 / y_sigma**2))
-signal = gaussian_2d(x, y).unsqueeze(0)
+# gaussian_2d = lambda x, y: amplitude * torch.exp(-0.5 * (((x - x_mean) * torch.cos(theta) - (y - y_mean) * torch.sin(theta))**2 / x_sigma**2 + ((x - x_mean) * torch.sin(theta) + (y - y_mean) * torch.cos(theta))**2 / y_sigma**2))
+# signal = gaussian_2d(x, y).unsqueeze(0)
 
-# %% 
+# # %% 
 
-D = ConvOperator(domain=('x','y'), order=2)
-direct_conv= D(signal)
-spectral_conv = D.spectral_convolution(signal)
-manual_conv = D.differentiate(signal, correlation=True, slice_pad=True)
+# D = ConvOperator(domain=('x','y'), order=2)
+# direct_conv= D(signal)
+# spectral_conv = D.spectral_convolution(signal)
+# manual_conv = D.differentiate(signal, correlation=True, slice_pad=True)
 
-# %% 
-#Inverse 
-diff = D.differentiate(signal, correlation=True, slice_pad=True)
-integ = D.integrate(diff, correlation=False, slice_pad=True)
+# # %% 
+# #Inverse 
+# diff = D.differentiate(signal, correlation=True, slice_pad=True)
+# integ = D.integrate(diff, correlation=False, slice_pad=True)
 
-plt.imshow(integ[0] - signal[0])
-plt.colorbar()
+# plt.imshow(integ[0] - signal[0])
+# plt.colorbar()
 
-# %%
+# # %%

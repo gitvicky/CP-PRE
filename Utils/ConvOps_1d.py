@@ -274,7 +274,7 @@ class ConvOperator():
         Performs the forward pass of the derivative convolution.
 
         Args:
-            field (torch.Tensor): Input tensor of shape (BS, Nt)
+            field (torch.Tensor): Input tensor of shape (BS, Nt, Nx)
 
         Returns:
             torch.Tensor: Result of the derivative convolution
@@ -346,4 +346,12 @@ manual_res = D.differentiate(solution, correlation=True, slice_pad=True) #Manual
 #Inverse 
 diff = D.differentiate(solution, correlation=False, slice_pad=False)
 integ = D.integrate(diff, correlation=True, slice_pad=True)
+# %%
+#Defining the required Convolutional Operations. 
+D_t = ConvOperator(domain='t', order=1)
+D_x = ConvOperator(domain='x', order=1)
+D_xx = ConvOperator(domain='x', order=2)
+
+uu = torch.rand(64, 1, 256)
+res = dx*D_t(uu) + dt * uu * D_x(uu) - 0.001 / np.pi * D_xx(uu) * (2*dt/dx)
 # %%
