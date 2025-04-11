@@ -448,8 +448,6 @@ def analyze_residuals(x, neural_sol, a, b):
     Returns:
         tuple: Residuals and retrieved solution
     """
-         x²(d²y/dx²) + ax(dy/dx) + by = 0
-
     dx = x[1] - x[0]
     
     # Extract position and its derivative
@@ -607,3 +605,9 @@ y_retrieved = D_simplified.integrate(y_res, correlation=True, slice_pad=False)
 
 
 # %%
+
+
+# x.D(y) = 0
+# hat(x) * (hat(D)*hat(y)) = 0  
+
+# inverse = 1 / (hat(x) * (hat(D)*hat(y)) + eps)

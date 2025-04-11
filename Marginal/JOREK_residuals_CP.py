@@ -168,7 +168,9 @@ model = FNO_multi2d(configuration['T_in'], configuration['Step'], configuration[
 model.load_state_dict(torch.load(model_loc + '/FNO_MHD_grating-cookie.pth', map_location='cpu'))
 
 #Model Predictions.
+start_time = time.time()
 pred_encoded_cal, mse, mae = validation_AR(model, u_in_cal, u_out_encoded_cal, configuration['Step'], configuration['T_out'])
+pred_time = time.time() - start_time
 
 print('Calibration (MSE) Error: %.3e' % (mse))
 print('Calibration (MAE) Error: %.3e' % (mae))
@@ -245,7 +247,9 @@ def residual_temperature(vars, boundary=False, norms=False):
 
 #Temperature
 cal_out_residual = residual_temperature(u_out_cal)
+start_time = time.time()
 cal_pred_residual = residual_temperature(pred_cal)
+cal_time = time.time() - start_time
 
 ncf_scores = np.abs(cal_out_residual.numpy() - cal_pred_residual.numpy())
 

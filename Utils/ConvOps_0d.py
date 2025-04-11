@@ -221,20 +221,12 @@ class ConvOperator():
 
         output = irfftn(field_fft * inv_kernel_fft, dim=tuple(range(2, field.ndim)))
 
-            # Remove extra padded values
-        if slice_pad == True and correlation==True:
+        # Remove extra padded values
+        if slice_pad==True:
             crop_slices = [slice(None), slice(None)] + [
                 slice(0, (padded_field.size(i) - kernel.size(i) + 1), 1)#stride=1
                 for i in range(2, padded_field.ndim)
             ]
-
-            # Remove extra padded values
-        if slice_pad == True and correlation==False:
-            crop_slices = [slice(None), slice(None)] + [
-                slice(-(padded_field.size(i) - kernel.size(i) + 1),  -1, 1)#stride=1
-                for i in range(2, padded_field.ndim)
-            ]
-
             output = output[crop_slices].contiguous()
 
         return output.squeeze(1)

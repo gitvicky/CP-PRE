@@ -6,13 +6,16 @@
 Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator 
 - prefefined using a Finite Difference Scheme. 
 
-Data used for all operations should be in the shape: BS, Nx, Ny
+Data used for all operations should be in the shape: BS, 1, Nx, Ny 
+
+#variable dimension is preserved
 """
+# %% 
 import numpy as np 
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F
-from fft_conv_pytorch.fft_conv import * 
+from PRE.fft_conv_pytorch.fft_conv import * 
 
 def get_stencil(dims, deriv_order, taylor_order=2):
     if dims == 1:
@@ -30,9 +33,9 @@ def get_stencil(dims, deriv_order, taylor_order=2):
             ], dtype=torch.float32)
         elif deriv_order == 1 and taylor_order == 2:
             return torch.tensor([
-                [0, -1, 0],
+                [0, -1/2, 0],
                 [0, 0, 0],
-                [0, 1, 0]
+                [0, 1/2, 0]
             ], dtype=torch.float32)
     elif dims == 2:
         if deriv_order == 2 and taylor_order == 2:
@@ -77,8 +80,7 @@ class ConvOperator():
             Can be 't' for time domain or ('x', 'y') for spatial domain.
         order (int): The order of derivation.
     """
-    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='direct', device='cpu', requires_grad=False):
-
+    def __init__(self, domain=None, order=None, scale=1.0, taylor_order=2, conv='direct', device=torch.device("cuda"), requires_grad=False):
         try: 
             self.domain = domain #Axis across with the derivative is taken. 
             self.dims = len(self.domain) #Domain size
@@ -95,8 +97,11 @@ class ConvOperator():
                 raise ValueError("Invalid Domain. Must be either x,y or their combination")
             
             self.kernel = self.stencil
-            self.kernel = scale*self.kernel
             self.kernel = self.kernel.to(device)
+
+            self.scale = torch.tensor(scale, dtype=torch.float32, device=device, requires_grad=True)
+            self.scale.to(device)
+            self.kernel = self.scale*self.kernel
 
             if requires_grad==True:
                 self.kernel.requires_grad_ = True 
@@ -123,11 +128,12 @@ class ConvOperator():
         Returns:
             torch.Tensor: The result of the 3D derivative convolution.
         """
+
         if kernel != None: 
             self.kernel = kernel
 
-        conv = F.conv2d(field.unsqueeze(1), self.kernel.unsqueeze(0).unsqueeze(0), padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2))
-        return conv.squeeze(1)
+        conv = F.conv2d(field, self.kernel.unsqueeze(0).unsqueeze(0))
+        return conv
     
 
     def spectral_convolution(self, field, kernel=None, inverse=False):
@@ -146,14 +152,10 @@ class ConvOperator():
         if kernel is not None:
             self.kernel = kernel
 
-        # Add channel dimension for conv1d
-        if field.dim() == 3:
-            field = field.unsqueeze(1)
-
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
         convfft = fft_conv(field, kernel, padding=(self.kernel.shape[0]//2, self.kernel.shape[1]//2), inverse=inverse)
 
-        return convfft.squeeze(1)
+        return convfft
 
 
     def differentiate(self, field, kernel=None, correlation=False, slice_pad=True):
@@ -172,9 +174,6 @@ class ConvOperator():
         if kernel is not None:
             self.kernel = kernel
 
-        # Add channel dimension for conv1d
-        if field.dim() == 3:
-            field = field.unsqueeze(1)
 
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size,pad_size,pad_size,pad_size), mode='constant')
@@ -205,7 +204,7 @@ class ConvOperator():
 
             output = output[crop_slices].contiguous()
 
-        return output.squeeze(1)
+        return output
 
 
     def integrate(self, field, kernel=None, correlation=False, slice_pad=False, eps=1e-6):
@@ -225,10 +224,6 @@ class ConvOperator():
         
         if kernel is not None:
                 self.kernel = kernel
-
-        # Add channel dimension for conv1d
-        if field.dim() == 3:
-            field = field.unsqueeze(1)
 
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size,pad_size,pad_size,pad_size), mode='constant')
@@ -261,7 +256,7 @@ class ConvOperator():
 
             output = output[crop_slices].contiguous()
 
-        return output.squeeze(1)
+        return output
 
 
 

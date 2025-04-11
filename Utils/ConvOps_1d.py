@@ -181,7 +181,6 @@ class ConvOperator():
 
         pad_size = self.kernel.size(-1) // 2
         padded_field = F.pad(field, (pad_size, pad_size, pad_size, pad_size), mode='constant')
-        
         field_fft = torch.fft.rfftn(padded_field.float(), dim=tuple(range(2, field.ndim)))
         kernel = self.kernel.unsqueeze(0).unsqueeze(0)
 
@@ -314,44 +313,44 @@ def convection_solution(initial_condition, c, dt, nt):
     return torch.cat([initial_condition(torch.arange(initial_condition.shape[2]).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
 
 
-# Define parameters
-nx = 100
-nt = 50
-c = 1.0
-dt = 0.1
-x = np.linspace(0, 1 ,nx)
-dx = x[1]-x[0]
+# # Define parameters
+# nx = 100
+# nt = 50
+# c = 1.0
+# dt = 0.1
+# x = np.linspace(0, 1 ,nx)
+# dx = x[1]-x[0]
 
-# Initial condition function (Gaussian)
-def initial_condition(x):
-    return torch.exp(-(x - nx/2)**2 / 50).reshape(1, 1, -1)
+# # Initial condition function (Gaussian)
+# def initial_condition(x):
+#     return torch.exp(-(x - nx/2)**2 / 50).reshape(1, 1, -1)
 
-# One-liner solution
-solution = torch.cat([initial_condition(torch.arange(nx).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
-# plt.plot(solution[0].T)
+# # One-liner solution
+# solution = torch.cat([initial_condition(torch.arange(nx).unsqueeze(0) - c * i * dt) for i in range(nt)], dim=1)
+# # plt.plot(solution[0].T)
 
 
-# %%
+# # %%
 
-D_t = ConvOperator(domain='t', order=1)
-D_x = ConvOperator(domain='x', order=1)
-D = ConvOperator()
-D.kernel = D_t.kernel + dt/dx*c*D_x.kernel
+# D_t = ConvOperator(domain='t', order=1)
+# D_x = ConvOperator(domain='x', order=1)
+# D = ConvOperator()
+# D.kernel = D_t.kernel + dt/dx*c*D_x.kernel
 
-direct_res = D(solution) #direct convolution
-spectral_res = D.spectral_convolution(solution) #spectral convolution
-manual_res = D.differentiate(solution, correlation=True, slice_pad=True) #Manual
+# direct_res = D(solution) #direct convolution
+# spectral_res = D.spectral_convolution(solution) #spectral convolution
+# manual_res = D.differentiate(solution, correlation=True, slice_pad=True) #Manual
 
-# %%
-#Inverse 
-diff = D.differentiate(solution, correlation=False, slice_pad=False)
-integ = D.integrate(diff, correlation=True, slice_pad=True)
-# %%
-#Defining the required Convolutional Operations. 
-D_t = ConvOperator(domain='t', order=1)
-D_x = ConvOperator(domain='x', order=1)
-D_xx = ConvOperator(domain='x', order=2)
+# # %%
+# #Inverse 
+# diff = D.differentiate(solution, correlation=False, slice_pad=False)
+# integ = D.integrate(diff, correlation=True, slice_pad=True)
+# # %%
+# #Defining the required Convolutional Operations. 
+# D_t = ConvOperator(domain='t', order=1)
+# D_x = ConvOperator(domain='x', order=1)
+# D_xx = ConvOperator(domain='x', order=2)
 
-uu = torch.rand(64, 1, 256)
-res = dx*D_t(uu) + dt * uu * D_x(uu) - 0.001 / np.pi * D_xx(uu) * (2*dt/dx)
-# %%
+# uu = torch.rand(64, 1, 256)
+# res = dx*D_t(uu) + dt * uu * D_x(uu) - 0.001 / np.pi * D_xx(uu) * (2*dt/dx)
+# # %%
