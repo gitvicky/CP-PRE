@@ -1,6 +1,5 @@
 import numpy as np
-from interval import interval, imath
-from zonotope import Zonotope
+from zonopy import interval, zonotope
 
 
 def complex_prod(Z, C):
@@ -23,7 +22,7 @@ def complex_prod(Z, C):
         [np.sin(angle), np.cos(angle)]
     ])
     
-    Z_rot = Z.linear_map(rot_matrix)
+    Z_rot = linear_map(rot_matrix, Z)
     return scaling_fac * Z_rot
 
 
@@ -38,8 +37,8 @@ def convert_interval_to_zonotope(intv):
     - A zonotope representing the interval on the real axis
     """
     # Extract lower and upper bounds
-    inf_val = float(intv[0][0])
-    sup_val = float(intv[0][1])
+    inf_val = float(intv.inf)
+    sup_val = float(intv.sup)
     
     # Create center and generator
     center = np.array([(inf_val + sup_val) / 2, 0])
@@ -47,26 +46,8 @@ def convert_interval_to_zonotope(intv):
     # Create generator matrix
     radius = (sup_val - inf_val) / 2
     generators = np.array([[radius, 0], [0, 0]]).T
-    
-    return Zonotope(center, generators)
 
-
-def overapproximate(Z, target_type=None):
-    """
-    Overapproximate a zonotope, potentially with fewer generators.
-    In this implementation, we just return the original zonotope or call 
-    the reduce_generators method if the zonotope has too many generators.
-    
-    Parameters:
-    - Z: A zonotope
-    - target_type: Placeholder for compatibility with Julia code
-    
-    Returns:
-    - An overapproximated zonotope
-    """
-    if Z.generators.shape[1] > 50:  # Arbitrary threshold
-        return Z.reduce_generators(30)  # Reduce to 30 generators
-    return Z
+    return zonotope(np.vstack([center, generators]))
 
 
 def minkowski_sum(Z1, Z2):
@@ -82,18 +63,11 @@ def minkowski_sum(Z1, Z2):
     return Z1 + Z2
 
 
-def scale(factor, Z):
-    """
-    Scale a zonotope by a factor.
-    
-    Parameters:
-    - factor: A scalar
-    - Z: A zonotope
-    
-    Returns:
-    - The scaled zonotope
-    """
-    return factor * Z
+def linear_map(M, Z):
+
+    c = np.matmul(M, Z.center)
+    G = np.matmul(M, Z.generators.T)
+    return zonotope(np.vstack([c, G.T]))
 
 
 def intervalFFT_(Xk, h):
@@ -127,19 +101,12 @@ def intervalFFT_(Xk, h):
             [rot_matrices[i][0][0], 0],
             [rot_matrices[i][1][0], 0]
         ])
-        Zk_rot.append(Zk[i].linear_map(matrix))
-    
-    # Overapproximate
-    Zs = [overapproximate(z) for z in Zk_rot]
+        Zk_rot.append(linear_map(matrix, Zk[i]))
     
     # Compute Minkowski sum
-    Z_out = minkowski_sum(Zs[1], Zs[0])
+    Z_out = minkowski_sum(Zk_rot[1], Zk_rot[0])
     for i in range(2, N_data):
-        Z_out = minkowski_sum(Zs[i], Z_out)
-        
-        # Periodically reduce generators to manage complexity
-        if i % 10 == 0:
-            Z_out = overapproximate(Z_out)
+        Z_out = minkowski_sum(Zk_rot[i], Z_out)
     
     return Z_out
 
@@ -169,21 +136,14 @@ def inverse_intervalFFT_(Zh, k):
     ]
     
     # Apply rotations
-    Zh_rot = [Zh[i].linear_map(rot_matrices[i]) for i in range(N_data)]
-    
-    # Overapproximate
-    Zs = [overapproximate(z) for z in Zh_rot]
+    Zh_rot = [linear_map(rot_matrices[i], Zh[i]) for i in range(N_data)]
     
     # Compute Minkowski sum
-    Z_out = minkowski_sum(Zs[1], Zs[0])
+    Z_out = minkowski_sum(Zh_rot[1], Zh_rot[0])
     for i in range(2, N_data):
-        Z_out = minkowski_sum(Zs[i], Z_out)
-        
-        # Periodically reduce generators to manage complexity
-        if i % 10 == 0:
-            Z_out = overapproximate(Z_out)
+        Z_out = minkowski_sum(Zh_rot[i], Z_out)
     
-    return scale(1/N_data, Z_out)
+    return 1/N_data * Z_out
 
 
 def intervalFFT(Xk):
@@ -222,10 +182,9 @@ def Real(Z):
     Returns:
     - An interval representing the real part
     """
-    Z_highs = Z.high()
-    Z_lows = Z.low()
+    Z_interval = Z.to_interval()
     
-    return interval([Z_lows[0], Z_highs[0]])
+    return Z_interval[0]
 
 
 def box(Z):
@@ -238,13 +197,8 @@ def box(Z):
     Returns:
     - Two intervals: real and imaginary parts
     """
-    Z_highs = Z.high()
-    Z_lows = Z.low()
-    
-    Z_real = interval([Z_lows[0], Z_highs[0]])
-    Z_imag = interval([Z_lows[1], Z_highs[1]])
-    
-    return Z_real, Z_imag
+
+    return Z.to_interval()
 
 
 def amplitude(Z):

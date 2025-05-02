@@ -2,14 +2,13 @@
 import numpy as np
 from scipy.fft import fft, ifft
 import matplotlib.pyplot as plt
-from interval import interval
 import random
 
 # Import our custom modules
-from zonotope import Zonotope
+from zonopy import zonotope, interval
 from intervalFFT import (
     intervalFFT, inverse_intervalFFT, Real, 
-    complex_prod, convert_interval_to_zonotope
+    complex_prod
 )
 
 
@@ -69,9 +68,9 @@ def set_PRE(neural_test):
     left_edges = convolved[-1]
     
     # Create interval sets for different parts
-    convolved_set_center = [interval([-abs(x.real), abs(x.real)]) for x in convolved_noedges]
-    convolved_set_right = [interval([x.real, x.real]) for x in right_edges]
-    convolved_set_left = [interval([left_edges.real, left_edges.real])]
+    convolved_set_center = [interval(-abs(x.real), abs(x.real)) for x in convolved_noedges]
+    convolved_set_right = [interval(x.real, x.real) for x in right_edges]
+    convolved_set_left = [interval(left_edges.real, left_edges.real)]
     
     # Combine all parts
     convolved_set = convolved_set_right + convolved_set_center + convolved_set_left
@@ -81,6 +80,7 @@ def set_PRE(neural_test):
     
     # Multiply with inverse kernel
     convolved_set_fft_kernel = [complex_prod(z, c) for z, c in zip(convolved_set_fft, inverse_kernel)]
+    # complex_prod(convolved_set_fft[0], inverse_kernel[0])
     
     # Perform inverse interval FFT
     retrieved_signal = inverse_intervalFFT(convolved_set_fft_kernel)
@@ -133,8 +133,8 @@ def main():
     plt.plot(numerical_test[:, 0], label="numerical")
     
     # Plot bounds
-    upper_bounds = [float(interval_obj[0][1]) for interval_obj in signal_bounds_back]
-    lower_bounds = [float(interval_obj[0][0]) for interval_obj in signal_bounds_back]
+    upper_bounds = [float(interval_obj.sup) for interval_obj in signal_bounds_back]
+    lower_bounds = [float(interval_obj.inf) for interval_obj in signal_bounds_back]
     plt.fill_between(range(len(signal_bounds_back)), lower_bounds, upper_bounds, alpha=0.2)
     
     plt.legend()

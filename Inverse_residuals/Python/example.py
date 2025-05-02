@@ -1,7 +1,7 @@
 # %%
 import numpy as np
 import matplotlib.pyplot as plt
-from interval import interval
+from zonopy import interval, zonotope
 import sys
 
 # Add the current directory to the path to import our modules
@@ -82,8 +82,8 @@ def test_with_synthetic_data():
     plt.plot(t, numerical_test[:, 0], 'r--', label='Numerical solution')
     
     # Plot bounds
-    upper_bounds = [float(interval_obj[0][1]) for interval_obj in signal_bounds_back]
-    lower_bounds = [float(interval_obj[0][0]) for interval_obj in signal_bounds_back]
+    upper_bounds = [float(interval_obj.sup) for interval_obj in signal_bounds_back]
+    lower_bounds = [float(interval_obj.inf) for interval_obj in signal_bounds_back]
     plt.fill_between(t[1:], lower_bounds, upper_bounds, color='gray', alpha=0.3, label='PRE bounds')
     
     plt.title('PRE Set Bounds Demonstration with Synthetic Data')
