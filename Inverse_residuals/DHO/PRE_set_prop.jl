@@ -7,7 +7,7 @@ using FFTW
 m = 1
 k = 1
 c = 0.2
-# c = 2
+# c = 2.0
 D_t_kernel = [-1, 0, 1]
 D_tt_kernel = [1, -2, 1] 
 dt = 0.1515151560306549
@@ -21,8 +21,8 @@ end
 
 include("../julia_files/intervalFFT.jl")
 
-numerical_sol = npzread("DHO_numerical_outputs_2_poor.npy")
-neural_sol = npzread("DHO_neural_outputs_2_poor.npy")
+numerical_sol = npzread("DHO_numerical_outputs_2.npy")
+neural_sol = npzread("DHO_neural_outputs_2.npy")
 
 # numerical_sol = npzread("DHO_numerical_outputs_20_poor.npy")
 # neural_sol = npzread("DHO_neural_outputs_20_poor.npy")
@@ -86,4 +86,6 @@ println("Numerical is in: $is_it_in_numerical and Neural is in: $is_it_in_neural
 
 plot(neural_test[:, 1], label = "neural")
 plot!(numerical_test[:, 1], label = "numerical")
-plot!(sup.(signal_bounds_back), fill_between = inf.(signal_bounds_back), alpha = 0.2)
+plot!(sup.(signal_bounds_back), fill_between = inf.(signal_bounds_back), alpha = 0.2, label = "PRE-bounds")
+plot!(tickfontsize = 15, xlabel = "time", xguidefontsize=20, yguidefontsize=20)
+savefig("DHO_4.pdf")

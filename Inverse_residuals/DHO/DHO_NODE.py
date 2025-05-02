@@ -21,7 +21,7 @@ from scipy.integrate import solve_ivp
 
 # Import your ConvOps module
 import sys
-sys.path.append("/Users/Vicky/Documents/UKAEA/Code/Uncertainty_Quantification/PDE_Residuals")
+sys.path.append("/Users/akgray/Documents/pystuff/PRE-CP")
 from Utils.ConvOps_0d import ConvOperator
 
 
@@ -377,8 +377,16 @@ def analyze_residuals(t, neural_sol, m, c, k):
     
     # Create damped operator: m*D_tt + c*D_t + k*identity
     D_damped = ConvOperator(conv='spectral')
+
+    print(f"dt: {dt}")
+    print(f"c: {c}")
+    print(f"D_t: {D_t.kernel}")
+    print(f"D_tt: {D_tt.kernel}")
+    print(f"D_identity.kernel: {D_identity.kernel}")
     D_damped.kernel = 2*m*D_tt.kernel + dt*c*D_t.kernel + 2*dt**2*k*D_identity.kernel
-    
+    print("Kernel")
+    print(D_damped.kernel)
+
     # Calculate residuals
     residuals = D_damped(x)
     
@@ -397,8 +405,8 @@ if __name__ == "__main__":
     
     # Test different damping scenarios
     damping_cases = [
-        {'c': 0.2, 'name': 'Underdamped (ζ < 1)'},
-        {'c': 2.0, 'name': 'Critical/Overdamped (ζ ≥ 1)'}
+        {'c': 2.0, 'name': 'Critical/Overdamped (ζ ≥ 1)'},
+        {'c': 0.2, 'name': 'Underdamped (ζ < 1)'}
     ]
     
     for case in damping_cases:
@@ -419,8 +427,18 @@ if __name__ == "__main__":
         # Initialize and train neural ODE
         func = ODEFunc(hidden_dim=64)
         losses = train_neural_ode(
-            func, t, states, derivs, n_epochs=1000, batch_size=16)
+            func, t, states, derivs, n_epochs=100, batch_size=16)
         
+        print("\nEvaluating on multiple initial conditions...")
+        t, num_solns, neural_solns = evaluate(
+            oscillator, func, t_span, n_points, x_range=(-2, 2), v_range=(-2, 2), n_solves=100)
+
+    
+        # Save results
+        np.save(f"DHO_numerical_outputs_{int(c*10)}_poor", num_solns)
+        np.save(f"DHO_neural_outputs_{int(c*10)}_poor", neural_solns)
+        
+
         # Compare solutions
         initial_state = np.array([1.0, 0.0])  # x0 = 1, v0 = 0
         t, numerical_sol, neural_sol = compare_solutions(
