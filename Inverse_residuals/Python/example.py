@@ -52,7 +52,6 @@ def test_with_synthetic_data():
     numerical_sol = np.load("ODE_outputs.npy")
     neural_sol = np.load("Nueral_outputs.npy")
 
-    
     # Select a random sample
     idx = np.random.randint(0, len(numerical_sol))
     print(f"Selected sample {idx} for testing")
