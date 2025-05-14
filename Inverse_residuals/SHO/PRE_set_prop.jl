@@ -18,8 +18,8 @@ end
 
 include("intervalFFT.jl")
 
-numerical_sol = npzread("ODE_outputs_poor.npy")
-neural_sol = npzread("Nueral_outputs_poor.npy")
+numerical_sol = npzread("ODE_outputs.npy")
+neural_sol = npzread("Nueral_outputs.npy")
 
 function set_PRE(neural_test)
 

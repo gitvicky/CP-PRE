@@ -52,6 +52,12 @@ class CNS_residuals(nn.Module):
         self.D_t = ConvOperator(domain='t', order=1)
         self.D_x = ConvOperator(domain='x', order=1)
         self.D_y = ConvOperator(domain='y', order=1)
+        self.D_x_y = ConvOperator(domain='x, y', order=2)
+
+        # self.D_xx = ConvOperator(domain='x', order=2)
+        # self.D_yy = ConvOperator(domain='y', order=2)
+        
+        self.D_xx_yy = ConvOperator(domain='x, y', order=2)
 
 
     def mass(self, vars, boundary=False):
@@ -61,9 +67,36 @@ class CNS_residuals(nn.Module):
         
         mass_residual = self.D_t(rho) + self.rho*(self.D_x(u) + self.D_y(v)) + u*self.D_x(rho) + v*self.D_y(rho)
 
+        #scaling the residuals
+        mass_residual = self.D_t(rho)*self.dx + self.rho*(self.D_x(u) + self.D_y(v))*self.dt + u*self.D_x(rho)*self.dt + v*self.D_y(rho)*self.dt
+
         if boundary: 
             return mass_residual
         else:
             return mass_residual[...,1:-1,1:-1,1:-1]
     
 
+    def momentum(self, vars, params, boundary=False):
+
+        rho = vars[:, 0:1]
+        u   = vars[:, 1:2]
+        v   = vars[:, 2:3]
+        p   = vars[:, 3:4]   
+
+        eta = params['eta']
+        zeta = params['zeta']
+
+        mom_res_x = rho*self.D_t(u) + u*self.D_x(u) + v*self.D_y(u) + self.D_x(p) - eta*self.D_xx_yy(u) - (zeta+eta/3)*(self.D_x(self.D_x(u) + self.D_y(v)))
+        mom_res_y = rho*self.D_t(v) + u*self.D_x(v) + v*self.D_y(v) + self.D_y(p) - eta*self.D_xx_yy(v) - (zeta+eta/3)*(self.D_y(self.D_x(u) + self.D_y(v)))
+        
+        #scaling the residuals
+        mom_res_x = rho*self.D_t(u)*2*self.dx**2 + u*self.D_x(u)*2*self.dt*self.dx + v*self.D_y(u)*2*self.dt*self.dx + self.D_x(p)*2*self.dt*self.dx - eta*self.D_xx_yy(u)*4*self.dt - (zeta+eta/3)*(self.D_x(self.D_x(u) + self.D_y(v)))*2*self.dt
+        mom_res_y = rho*self.D_t(v)*2*self.dx**2 + u*self.D_x(v)*2*self.dt*self.dx + v*self.D_y(v)*2*self.dt*self.dx + self.D_y(p)*2*self.dt*self.dx - eta*self.D_xx_yy(v)*4*self.dt - (zeta+eta/3)*(self.D_y(self.D_x(u) + self.D_y(v)))*2*self.dt
+
+        mom_residuals = mom_res_x + mom_res_y
+
+        if boundary: 
+            return mom_residuals
+        else:
+            return mom_residuals[...,1:-1,1:-1,1:-1]
+    
