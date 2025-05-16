@@ -53,6 +53,7 @@ def set_PRE(neural_test):
     N_signal = len(signal_padded)
     N_pad = N_signal - len(D_pos_kernel)
     kernel_pad = np.concatenate((D_pos_kernel, np.zeros(N_pad)))
+    print(kernel_pad)
     
     # Compute FFT
     signal_fft = fft(signal_padded)
