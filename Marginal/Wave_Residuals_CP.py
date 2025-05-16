@@ -381,9 +381,9 @@ ax.set_xlabel(r'$x$', fontsize=36)
 ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Prediction $(u)$', fontsize=36)
 
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.svg", format="svg", transparent=True, bbox_inches='tight')
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.pdf", format="pdf", transparent=True, bbox_inches='tight')
-plt.show()
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.svg", format="svg", transparent=True, bbox_inches='tight')
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_pred.pdf", format="pdf", transparent=True, bbox_inches='tight')
+# plt.show()
 
 
 
@@ -416,9 +416,9 @@ ax.set_xlabel(r'$x$', fontsize=36)
 ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'PRE $\left(D(u)\right)$', fontsize=36)
 
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.svg", format="svg",transparent=True, bbox_inches='tight')
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.pdf", format="pdf",transparent=True, bbox_inches='tight')
-plt.show()
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.svg", format="svg",transparent=True, bbox_inches='tight')
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_residual.pdf", format="pdf",transparent=True, bbox_inches='tight')
+# plt.show()
 
 
 # Create figure and axis
@@ -450,9 +450,9 @@ ax.set_xlabel(r'$x$', fontsize=36)
 ax.set_ylabel(r'$y$', fontsize=36)
 ax.set_title(r'Marginal CP ($+\hat q)$', fontsize=36)
 
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
-plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
-plt.show()
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.svg", format="svg", transparent=True, bbox_inches='tight')
+# plt.savefig(os.path.dirname(os.getcwd()) + "/Plots/marginal_wave_qhat.pdf", format="pdf", transparent=True, bbox_inches='tight')
+# plt.show()
 
 # %%
 #Further Rebuttal Plots - Exploring discretisation. - Larger Temporal Discretisations. 

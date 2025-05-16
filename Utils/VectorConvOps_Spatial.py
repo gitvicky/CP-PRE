@@ -10,8 +10,8 @@ Make sure BS and Nvar are present
 """
 # %%
 
-from PRE.ConvOps_Spatial import *
-from Utils.boundary_conditions import * 
+from ConvOps_Spatial import *
+from boundary_conditions import * 
 
 #############################################  
 #Vector Operations 

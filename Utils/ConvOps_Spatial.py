@@ -3,7 +3,7 @@
 """
 24th May, 2024
 
-Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator 
+Wrapper for Implementing Convolutional Operator as the Differential and Integral Operator in 2D 
 - prefefined using a Finite Difference Scheme. 
 
 Data used for all operations should be in the shape: BS, 1, Nx, Ny 
@@ -15,7 +15,7 @@ import numpy as np
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F
-from PRE.fft_conv_pytorch.fft_conv import * 
+from fft_conv_pytorch.fft_conv import * 
 
 def get_stencil(dims, deriv_order, taylor_order=2):
     if dims == 1:
