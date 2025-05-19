@@ -449,3 +449,40 @@ plt.show()
 
 
 # %%
+def testing_inverse(field, D, correlation=False, eps=1e-6):
+    """
+    Main function to compute PRE (Physics-Regularized Error) set bounds.
+    
+    Parameters:
+    - neural_test: Neural network solution vector
+    
+    Returns:
+    - List of intervals representing bounds on the solution
+    """
+
+    # Pad the signal
+    signal_padded = np.concatenate(([0], field, [0]))
+    
+    # Determine paddings
+    N_signal = len(signal_padded)
+    N_pad = N_signal - len(D.kernel)
+    kernel_pad = np.concatenate((D.kernel.numpy(), np.zeros(N_pad)))
+    
+    # Compute FFT
+    signal_fft = fft(signal_padded)
+    kernel_fft = fft(kernel_pad)
+
+    if correlation == True:
+        kernel_fft.imag *= -1
+        
+    # Convolve in frequency domain and compute inverse
+    convolved = ifft(signal_fft * kernel_fft)
+    inverse_kernel = 1/ (kernel_fft + eps)
+    retrieved_signal = ifft(inverse_kernel * signal_fft * kernel_fft)
+
+    plt.plot(signal_padded, label="Signal")
+    plt.plot(retrieved_signal, label="Retrieved Signal")
+    plt.legend()
+
+testing_inverse(neural_x, D_pos, correlation=False, eps=1e-6)
+# %%
