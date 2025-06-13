@@ -23,17 +23,33 @@ def get_stencil(dims, deriv_order, taylor_order=2):
                 [0, 1, 0],
                 [0, 0, 0]
             ], dtype=torch.float32)
+        elif deriv_order == 1 and taylor_order == 2:
+            return torch.tensor([
+                [0, -1, 0],
+                [0, 0, 0],
+                [0, 1, 0]
+            ], dtype=torch.float32)
         elif deriv_order == 2 and taylor_order == 2:
             return torch.tensor([
                 [0, 1, 0],
                 [0, -2, 0],
                 [0, 1, 0]
             ], dtype=torch.float32)
-        elif deriv_order == 1 and taylor_order == 2:
+        elif deriv_order == 3 and taylor_order == 2:
             return torch.tensor([
-                [0, -1, 0],
-                [0, 0, 0],
-                [0, 1, 0]
+                [0, 0, 1/2, 0, 0],
+                [0, 0, -1, 0, 0],
+                [0, 0, 0, 0, 0]
+                [0, 0, 1, 0, 0],
+                [0, 0, -1/2, 0, 0]
+            ], dtype=torch.float32)
+        elif deriv_order == 3 and taylor_order == 4:
+            return torch.tensor([
+                [0, 0, -1/8, 0, 0],
+                [0, 0, 1, 0, 0],
+                [0, 0, -13/8, 0, 0]
+                [0, 0, -1, 0, 0],
+                [0, 0, 1/8, 0, 0]
             ], dtype=torch.float32)
     elif dims == 2:
         if deriv_order == 2 and taylor_order == 2:
@@ -354,3 +370,15 @@ def convection_solution(initial_condition, c, dt, nt):
 # uu = torch.rand(64, 1, 256)
 # res = dx*D_t(uu) + dt * uu * D_x(uu) - 0.001 / np.pi * D_xx(uu) * (2*dt/dx)
 # # %%
+
+# %%
+#Combined Equation
+
+
+# D_t = ConvOperator(domain='t', order=1)
+# D_x = ConvOperator(domain='x', order=1)
+# D_xx = ConvOperator(domain='x', order=2)
+# D_xxx = ConvOperator(domain='x', order=3)
+
+# # ce_residual = D_t(u) + alpha*D_x(u**2) - beta*D_xx(u) + gamma*D_xxx(u) 
+# ce_residual = D_t(u)*2*dx**3 + alpha*D_x(u**2)*2*dt*dx**2 - beta*D_xx(u)*4*dt*dx + gamma*D_xxx(u)*4*dt 

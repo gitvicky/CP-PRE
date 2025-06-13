@@ -174,8 +174,8 @@ def normalisation(norm_strategy, norms):
     in_normalizer.b = torch.tensor(norms['in_b'])
 
     out_normalizer = MinMax_Normalizer(torch.tensor(0))
-    out_normalizer.a = torch.tensor(norms['in_a'])
-    out_normalizer.b = torch.tensor(norms['in_b'])
+    out_normalizer.a = torch.tensor(norms['out_a'])
+    out_normalizer.b = torch.tensor(norms['out_b'])
     
     return in_normalizer, out_normalizer
 
